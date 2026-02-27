@@ -2,14 +2,14 @@ import { io, Socket } from 'socket.io-client';
 
 let socket: Socket | null = null;
 
-export const initializeSocket = (url: string = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000') => {
+export const initializeSocket = (url: string = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3002') => {
   if (socket) return socket;
 
   socket = io(url, {
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
-    reconnectionAttempts: 5,
+    reconnectionAttempts: 0,
   });
 
   socket.on('connect', () => {
@@ -29,16 +29,25 @@ export const initializeSocket = (url: string = process.env.NEXT_PUBLIC_BACKEND_U
 
 export const getSocket = (): Socket | null => socket;
 
-export const executeCommand = (socket: Socket, deviceId: string, command: string): Promise<any> => {
+export const executeCommand = (
+  socket: Socket,
+  deviceId: string,
+  command: string,
+  payload?: Record<string, any>
+): Promise<any> => {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       reject(new Error('Command execution timeout'));
     }, 30000);
 
-    socket.emit('send_command', { device_id: deviceId, command }, (response: any) => {
+    socket.emit(
+      'send_command',
+      { deviceId, device_id: deviceId, command, payload },
+      (response: any) => {
       clearTimeout(timeout);
       resolve(response);
-    });
+      }
+    );
   });
 };
 

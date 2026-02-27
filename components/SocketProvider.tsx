@@ -5,6 +5,35 @@ import { Socket } from 'socket.io-client';
 import { initializeSocket, closeSocket } from '@/lib/socket';
 import { Device } from '@/lib/types';
 
+const normalizeDevice = (data: any, existing?: Device): Device => {
+  const deviceId = data?.device_id ?? data?.deviceId ?? existing?.device_id ?? '';
+  const deviceName = data?.device_name ?? data?.deviceName ?? existing?.device_name ?? 'Unknown';
+  const statusRaw =
+    data?.connection_status ??
+    data?.connectionStatus ??
+    data?.status ??
+    existing?.connection_status;
+
+  let connectionStatus: Device['connection_status'];
+  if (statusRaw === 'connected' || statusRaw === 'connecting' || statusRaw === 'disconnected') {
+    connectionStatus = statusRaw;
+  } else if (statusRaw === 'online') {
+    connectionStatus = 'connected';
+  } else if (statusRaw === 'offline') {
+    connectionStatus = 'disconnected';
+  } else {
+    connectionStatus = existing?.connection_status ?? 'connected';
+  }
+
+  return {
+    device_id: deviceId,
+    device_name: deviceName,
+    connection_status: connectionStatus,
+    health_metrics: data?.health_metrics ?? data?.healthMetrics ?? existing?.health_metrics,
+    last_seen: data?.last_seen ?? data?.lastSeen ?? existing?.last_seen,
+  };
+};
+
 interface SocketContextType {
   socket: Socket | null;
   isConnected: boolean;
@@ -25,7 +54,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
     newSocket.on('connect', () => {
       setIsConnected(true);
       console.log('[v0] Socket connected');
-      newSocket.emit('get_devices');
+      newSocket.emit('join_room');
     });
 
     newSocket.on('disconnect', () => {
@@ -35,13 +64,31 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
 
     newSocket.on('device_list', (data: Device[]) => {
       console.log('[v0] Received device list:', data);
-      setDevices(data);
+      setDevices((prev) => data.map((device) => normalizeDevice(device, prev.find((d) => d.device_id === (device as any)?.device_id))));
     });
 
     newSocket.on('device_status', (data: Device) => {
       console.log('[v0] Device status update:', data);
+      setDevices((prev) => {
+        const deviceId = (data as any)?.device_id ?? (data as any)?.deviceId;
+        const index = prev.findIndex((d) => d.device_id === deviceId);
+        if (index === -1) {
+          return [...prev, normalizeDevice(data)];
+        }
+        const next = [...prev];
+        next[index] = normalizeDevice(data, prev[index]);
+        return next;
+      });
+    });
+
+    newSocket.on('device_disconnected', (data: { device_id: string }) => {
+      console.log('[v0] Device disconnected:', data);
       setDevices((prev) =>
-        prev.map((d) => (d.device_id === data.device_id ? data : d))
+        prev.map((d) =>
+          d.device_id === data.device_id
+            ? { ...d, connection_status: 'disconnected', last_seen: new Date().toISOString() }
+            : d
+        )
       );
     });
 
