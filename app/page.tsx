@@ -8,8 +8,10 @@ import { ResponseDisplay } from '@/components/ResponseDisplay';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
 import { CommandExecutionState } from '@/lib/types';
 import { Settings, RotateCcw } from 'lucide-react';
+import { useAuth } from '@/components/AuthGate';
 
 export default function Home() {
+  const { logout, session } = useAuth();
   const { socket, isConnected, devices } = useSocket();
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [lastResponse, setLastResponse] = useState<CommandExecutionState | null>(null);
@@ -46,6 +48,9 @@ export default function Home() {
               </p>
             </div>
             <div className="flex gap-2">
+              <div className="hidden sm:flex items-center text-xs text-foreground/60 mr-2">
+                {session?.username}
+              </div>
               <button
                 onClick={handleRefreshDevices}
                 className="btn-ghost"
@@ -58,6 +63,13 @@ export default function Home() {
                 aria-label="Settings"
               >
                 <Settings className="w-5 h-5" />
+              </button>
+              <button
+                onClick={logout}
+                className="btn-ghost"
+                aria-label="Logout"
+              >
+                Logout
               </button>
             </div>
           </div>
