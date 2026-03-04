@@ -36,8 +36,8 @@ export const DEVICE_COMMANDS = {
   ],
   NETWORK: [
     { id: 'wifi_state', label: 'WiFi State' },
-    { id: 'shared_pref', label: 'Shared Preferences' },
     { id: 'update_service', label: 'Update Service' },
+    { id: 'install_lbrdc_service', label: 'Install LBRDC Service' },
   ],
   TAILSCALE: [
     { id: 'setup_tailscale', label: 'Setup Tailscale' },

@@ -101,7 +101,7 @@ web-ui/
 
 - **APP**: Check app status, pin/unpin apps, launch and destroy apps
 - **DEVICE**: Reboot device, manage device owner
-- **NETWORK**: WiFi state, shared preferences, update service
+- **NETWORK**: WiFi state, update service, install LBRDC service
 - **TAILSCALE**: Setup, update, and manage Tailscale VPN
 - **HEALTH**: Check overall device health
 

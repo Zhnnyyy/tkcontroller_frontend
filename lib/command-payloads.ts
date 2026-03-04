@@ -59,4 +59,13 @@ export const COMMAND_PAYLOAD_FIELDS: Record<string, PayloadField[]> = {
       required: true,
     },
   ],
+  install_lbrdc_service: [
+    {
+      key: 'download_url',
+      label: 'LBRDC service APK URL',
+      placeholder: 'https://',
+      type: 'url',
+      required: true,
+    },
+  ],
 };
