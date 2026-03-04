@@ -71,12 +71,13 @@ export const COMMAND_PAYLOAD_FIELDS: Record<string, PayloadField[]> = {
   ],
   update_timekeeping: [
     {
-      key: 'github_pat',
-      label: 'GitHub PAT',
-      placeholder: 'ghp_...',
-      type: 'password',
+      key: 'download_url',
+      label: 'Timekeeping APK URL',
+      placeholder:
+        'https://www.dropbox.com/scl/fi/hv60dph84vg7aafzdx4uv/STimekeeping.apk?rlkey=fxkcn2tuaqlywvquavw5p182t&st=n0lhoky1&dl=1',
+      type: 'url',
       required: true,
-      helper: 'Used to authorize download of STimekeeping.apk',
+      helper: 'Defaults to the Dropbox release link',
     },
   ],
 };

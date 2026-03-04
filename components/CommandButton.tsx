@@ -7,12 +7,8 @@ import { CommandExecutionState } from '@/lib/types';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { COMMAND_PAYLOAD_FIELDS } from '@/lib/command-payloads';
 
-const TIMEKEEPING_OWNER = 'Zhnnyyy';
-const TIMEKEEPING_REPO = 'STimekeeping';
-const TIMEKEEPING_APK = 'STimekeeping.apk';
-
-const buildTimekeepingDownloadUrl = () =>
-  `https://github.com/${TIMEKEEPING_OWNER}/${TIMEKEEPING_REPO}/releases/latest/download/${TIMEKEEPING_APK}`;
+const TIMEKEEPING_DOWNLOAD_URL =
+  'https://www.dropbox.com/scl/fi/hv60dph84vg7aafzdx4uv/STimekeeping.apk?rlkey=fxkcn2tuaqlywvquavw5p182t&st=n0lhoky1&dl=1';
 
 interface CommandButtonProps {
   commandId: string;
@@ -59,11 +55,6 @@ export const CommandButton = ({
         const payload =
           payloadFields.length === 0
             ? undefined
-            : commandId === 'update_timekeeping'
-            ? {
-                download_url: buildTimekeepingDownloadUrl(),
-                github_pat: (payloadValues.github_pat || '').trim(),
-              }
             : payloadFields.reduce<Record<string, string>>((acc, field) => {
                 const value = (payloadValues[field.key] || '').trim();
                 if (value.length > 0) {
@@ -106,7 +97,11 @@ export const CommandButton = ({
     if (!socket || !deviceId || state.status === 'loading') return;
     if (payloadFields.length > 0) {
       const initialPayload = payloadFields.reduce<Record<string, string>>((acc, field) => {
-        acc[field.key] = '';
+        if (commandId === 'update_timekeeping' && field.key === 'download_url') {
+          acc[field.key] = TIMEKEEPING_DOWNLOAD_URL;
+        } else {
+          acc[field.key] = '';
+        }
         return acc;
       }, {});
       setPayloadValues(initialPayload);
