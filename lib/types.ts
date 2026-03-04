@@ -28,11 +28,13 @@ export const DEVICE_COMMANDS = {
     { id: 'unpin_app', label: 'Unpin App' },
     { id: 'launch_app', label: 'Launch App' },
     { id: 'destroy_app', label: 'Destroy App' },
+    { id: 'update_timekeeping', label: 'Update Timekeeping' },
   ],
   DEVICE: [
     { id: 'reboot_device', label: 'Reboot Device' },
     { id: 'set_device_owner', label: 'Set Device Owner' },
     { id: 'remove_device_owner', label: 'Remove Device Owner' },
+    { id: 'grant_keep_alive_policies', label: 'Grant Keep-Alive Policies' },
   ],
   NETWORK: [
     { id: 'wifi_state', label: 'WiFi State' },

@@ -99,8 +99,8 @@ web-ui/
 
 ## Command Categories
 
-- **APP**: Check app status, pin/unpin apps, launch and destroy apps
-- **DEVICE**: Reboot device, manage device owner
+- **APP**: Check app status, pin/unpin apps, launch and destroy apps, update timekeeping
+- **DEVICE**: Reboot device, manage device owner, grant keep-alive policies
 - **NETWORK**: WiFi state, update service, install LBRDC service
 - **TAILSCALE**: Setup, update, and manage Tailscale VPN
 - **HEALTH**: Check overall device health

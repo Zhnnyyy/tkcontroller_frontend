@@ -7,6 +7,13 @@ import { CommandExecutionState } from '@/lib/types';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { COMMAND_PAYLOAD_FIELDS } from '@/lib/command-payloads';
 
+const TIMEKEEPING_OWNER = 'Zhnnyyy';
+const TIMEKEEPING_REPO = 'STimekeeping';
+const TIMEKEEPING_APK = 'STimekeeping.apk';
+
+const buildTimekeepingDownloadUrl = () =>
+  `https://github.com/${TIMEKEEPING_OWNER}/${TIMEKEEPING_REPO}/releases/latest/download/${TIMEKEEPING_APK}`;
+
 interface CommandButtonProps {
   commandId: string;
   label: string;
@@ -52,6 +59,11 @@ export const CommandButton = ({
         const payload =
           payloadFields.length === 0
             ? undefined
+            : commandId === 'update_timekeeping'
+            ? {
+                download_url: buildTimekeepingDownloadUrl(),
+                github_pat: (payloadValues.github_pat || '').trim(),
+              }
             : payloadFields.reduce<Record<string, string>>((acc, field) => {
                 const value = (payloadValues[field.key] || '').trim();
                 if (value.length > 0) {

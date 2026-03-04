@@ -65,7 +65,18 @@ export const COMMAND_PAYLOAD_FIELDS: Record<string, PayloadField[]> = {
       label: 'LBRDC service APK URL',
       placeholder: 'https://',
       type: 'url',
+      required: false,
+      helper: 'Leave blank to use the device default',
+    },
+  ],
+  update_timekeeping: [
+    {
+      key: 'github_pat',
+      label: 'GitHub PAT',
+      placeholder: 'ghp_...',
+      type: 'password',
       required: true,
+      helper: 'Used to authorize download of STimekeeping.apk',
     },
   ],
 };
