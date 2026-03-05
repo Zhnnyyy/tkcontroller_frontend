@@ -15,6 +15,7 @@ export interface CommandResponse {
 
 export interface CommandExecutionState {
   command: string;
+  commandId?: string;
   status: 'idle' | 'loading' | 'success' | 'error';
   response?: CommandResponse;
   error?: string;

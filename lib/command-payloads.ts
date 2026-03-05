@@ -58,6 +58,14 @@ export const COMMAND_PAYLOAD_FIELDS: Record<string, PayloadField[]> = {
       type: 'url',
       required: true,
     },
+    {
+      key: 'expected_sha256',
+      label: 'Expected SHA-256 (optional)',
+      placeholder: '64-char hex digest',
+      type: 'text',
+      required: false,
+      helper: 'If set, install is blocked on hash mismatch',
+    },
   ],
   install_lbrdc_service: [
     {
@@ -67,6 +75,14 @@ export const COMMAND_PAYLOAD_FIELDS: Record<string, PayloadField[]> = {
       type: 'url',
       required: false,
       helper: 'Leave blank to use the device default',
+    },
+    {
+      key: 'expected_sha256',
+      label: 'Expected SHA-256 (optional)',
+      placeholder: '64-char hex digest',
+      type: 'text',
+      required: false,
+      helper: 'If set, install is blocked on hash mismatch',
     },
   ],
   update_timekeeping: [
@@ -78,6 +94,14 @@ export const COMMAND_PAYLOAD_FIELDS: Record<string, PayloadField[]> = {
       type: 'url',
       required: true,
       helper: 'Defaults to the Dropbox release link',
+    },
+    {
+      key: 'expected_sha256',
+      label: 'Expected SHA-256 (optional)',
+      placeholder: '64-char hex digest',
+      type: 'text',
+      required: false,
+      helper: 'If set, install is blocked on hash mismatch',
     },
   ],
 };

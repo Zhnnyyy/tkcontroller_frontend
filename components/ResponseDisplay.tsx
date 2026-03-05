@@ -25,6 +25,19 @@ export const ResponseDisplay = ({ state, onClear }: ResponseDisplayProps) => {
   }
 
   const responseText = JSON.stringify(state.response || state.error, null, 2);
+  const progressPayload =
+    (state.response as any)?.data ||
+    (state.response as any)?.response ||
+    null;
+  const progressPercentRaw =
+    progressPayload?.percent ??
+    progressPayload?.download_percent ??
+    null;
+  const progressPercent =
+    typeof progressPercentRaw === 'number'
+      ? Math.max(0, Math.min(100, progressPercentRaw))
+      : null;
+  const progressStage = progressPayload?.stage;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(responseText);
@@ -71,6 +84,21 @@ export const ResponseDisplay = ({ state, onClear }: ResponseDisplayProps) => {
           {state.status.charAt(0).toUpperCase() + state.status.slice(1)}
         </div>
       </div>
+
+      {progressPercent !== null && (
+        <div className="mb-4">
+          <div className="flex items-center justify-between text-xs text-foreground/70 mb-2">
+            <span>{progressStage ? String(progressStage) : 'progress'}</span>
+            <span>{progressPercent}%</span>
+          </div>
+          <div className="h-2 bg-input rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary transition-all duration-300"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="bg-background border border-border rounded-lg p-4 mb-4 overflow-auto max-h-96">
         <pre className="text-sm text-foreground/80 font-mono whitespace-pre-wrap break-words">

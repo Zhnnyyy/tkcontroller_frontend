@@ -44,13 +44,55 @@ export const CommandButton = ({
   const executeCommand = async () => {
     if (!socket || !deviceId) return;
 
-    setState({ command: commandId, status: 'loading' });
+    const localCommandId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    let progressHandler: ((progress: any) => void) | null = null;
+    const initialState: CommandExecutionState = {
+      command: commandId,
+      commandId: localCommandId,
+      status: 'loading',
+      response: {
+        success: false,
+        message: 'Command started',
+        data: { command_id: localCommandId, stage: 'queued', percent: 0 },
+      },
+      timestamp: new Date().toISOString(),
+    };
+    setState(initialState);
+    onExecute(initialState);
 
     try {
+      progressHandler = (progress: any) => {
+        if (
+          progress?.command_id !== localCommandId ||
+          progress?.device_id !== deviceId ||
+          progress?.command !== commandId
+        ) {
+          return;
+        }
+        const progressState: CommandExecutionState = {
+          command: commandId,
+          commandId: localCommandId,
+          status: 'loading',
+          response: {
+            success: false,
+            message: progress?.message || 'In progress',
+            data: progress,
+          } as any,
+          timestamp: new Date().toISOString(),
+        };
+        setState(progressState);
+        onExecute(progressState);
+      };
+      socket.on('command_progress', progressHandler);
+
       const response = await new Promise((resolve, reject) => {
+        const timeoutMs = commandId === 'install_lbrdc_service' ? 180000 : 30000;
         const timeout = setTimeout(() => {
+          if (progressHandler) {
+            socket.off('command_progress', progressHandler);
+          }
           reject(new Error('Command execution timeout'));
-        }, 30000);
+        }, timeoutMs);
 
         const payload =
           payloadFields.length === 0
@@ -65,16 +107,20 @@ export const CommandButton = ({
 
         socket.emit(
           'send_command',
-          { deviceId, device_id: deviceId, command: commandId, payload },
+          { deviceId, device_id: deviceId, command: commandId, command_id: localCommandId, payload },
           (response: any) => {
-          clearTimeout(timeout);
-          resolve(response);
+            clearTimeout(timeout);
+            if (progressHandler) {
+              socket.off('command_progress', progressHandler);
+            }
+            resolve(response);
           }
         );
       });
 
       const newState: CommandExecutionState = {
         command: commandId,
+        commandId: (response as any)?.command_id || localCommandId,
         status: 'success',
         response: response as any,
         timestamp: new Date().toISOString(),
@@ -82,8 +128,12 @@ export const CommandButton = ({
       setState(newState);
       onExecute(newState);
     } catch (error) {
+      if (progressHandler) {
+        socket.off('command_progress', progressHandler);
+      }
       const newState: CommandExecutionState = {
         command: commandId,
+        commandId: localCommandId,
         status: 'error',
         error: error instanceof Error ? error.message : 'Unknown error',
         timestamp: new Date().toISOString(),
