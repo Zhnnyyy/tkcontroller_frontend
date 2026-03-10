@@ -69,15 +69,23 @@ export const COMMAND_PAYLOAD_FIELDS: Record<string, PayloadField[]> = {
       helper: 'Leave blank to use the device default',
     },
   ],
-  install_usb_autogrant_module: [
+  install_magisk_module: [
     {
       key: 'download_url',
       label: 'Magisk module ZIP URL',
-      placeholder:
-        'https://www.dropbox.com/scl/fi/zupwanunp47lfzeabent5/zkteco-autogrant.zip?rlkey=9sv0rpni1c1wk88q3adx9iuip&st=s4sq3nqb&dl=1',
+      placeholder: 'https://',
       type: 'url',
-      required: false,
-      helper: 'Defaults to the Dropbox USB autogrant module link',
+      required: true,
+    },
+  ],
+  remove_magisk_module: [
+    {
+      key: 'module_id',
+      label: 'Magisk module id',
+      placeholder: 'zygisk_lsposed',
+      type: 'text',
+      required: true,
+      helper: 'Use the module id from check_app_status > magisk_modules',
     },
   ],
   update_timekeeping: [

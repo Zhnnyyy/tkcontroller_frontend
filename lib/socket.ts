@@ -37,7 +37,7 @@ export const executeCommand = (
 ): Promise<any> => {
   return new Promise((resolve, reject) => {
     const timeoutMs =
-      command === 'install_lbrdc_service' || command === 'install_usb_autogrant_module'
+      command === 'install_lbrdc_service' || command === 'install_magisk_module'
         ? 180000
         : 30000;
     const timeout = setTimeout(() => {

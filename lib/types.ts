@@ -34,10 +34,11 @@ export const DEVICE_COMMANDS = {
   DEVICE: [
     { id: 'reboot_device', label: 'Reboot Device' },
     { id: 'magisk_fix_env', label: 'Magisk Fix Env' },
+    { id: 'install_magisk_module', label: 'Install Magisk Module' },
+    { id: 'remove_magisk_module', label: 'Remove Magisk Module' },
     { id: 'set_device_owner', label: 'Set Device Owner' },
     { id: 'remove_device_owner', label: 'Remove Device Owner' },
     { id: 'grant_keep_alive_policies', label: 'Grant Keep-Alive Policies' },
-    { id: 'install_usb_autogrant_module', label: 'Install USB Autogrant Module' },
   ],
   NETWORK: [
     { id: 'wifi_state', label: 'WiFi State' },

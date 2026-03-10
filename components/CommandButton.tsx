@@ -9,8 +9,6 @@ import { COMMAND_PAYLOAD_FIELDS } from '@/lib/command-payloads';
 
 const TIMEKEEPING_DOWNLOAD_URL =
   'https://www.dropbox.com/scl/fi/hv60dph84vg7aafzdx4uv/STimekeeping.apk?rlkey=fxkcn2tuaqlywvquavw5p182t&st=n0lhoky1&dl=1';
-const USB_AUTOGRANT_MODULE_URL =
-  'https://www.dropbox.com/scl/fi/zupwanunp47lfzeabent5/zkteco-autogrant.zip?rlkey=9sv0rpni1c1wk88q3adx9iuip&st=s4sq3nqb&dl=1';
 
 interface CommandButtonProps {
   commandId: string;
@@ -89,7 +87,7 @@ export const CommandButton = ({
 
       const response = await new Promise((resolve, reject) => {
         const timeoutMs =
-          commandId === 'install_lbrdc_service' || commandId === 'install_usb_autogrant_module'
+          commandId === 'install_lbrdc_service' || commandId === 'install_magisk_module'
             ? 180000
             : 30000;
         const timeout = setTimeout(() => {
@@ -154,8 +152,6 @@ export const CommandButton = ({
       const initialPayload = payloadFields.reduce<Record<string, string>>((acc, field) => {
         if (commandId === 'update_timekeeping' && field.key === 'download_url') {
           acc[field.key] = TIMEKEEPING_DOWNLOAD_URL;
-        } else if (commandId === 'install_usb_autogrant_module' && field.key === 'download_url') {
-          acc[field.key] = USB_AUTOGRANT_MODULE_URL;
         } else {
           acc[field.key] = '';
         }
