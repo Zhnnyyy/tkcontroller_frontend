@@ -36,6 +36,7 @@ export const DEVICE_COMMANDS = {
     { id: 'set_device_owner', label: 'Set Device Owner' },
     { id: 'remove_device_owner', label: 'Remove Device Owner' },
     { id: 'grant_keep_alive_policies', label: 'Grant Keep-Alive Policies' },
+    { id: 'install_usb_autogrant_module', label: 'Install USB Autogrant Module' },
   ],
   NETWORK: [
     { id: 'wifi_state', label: 'WiFi State' },

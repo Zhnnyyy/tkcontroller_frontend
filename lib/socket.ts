@@ -36,7 +36,10 @@ export const executeCommand = (
   payload?: Record<string, any>
 ): Promise<any> => {
   return new Promise((resolve, reject) => {
-    const timeoutMs = command === 'install_lbrdc_service' ? 180000 : 30000;
+    const timeoutMs =
+      command === 'install_lbrdc_service' || command === 'install_usb_autogrant_module'
+        ? 180000
+        : 30000;
     const timeout = setTimeout(() => {
       reject(new Error('Command execution timeout'));
     }, timeoutMs);

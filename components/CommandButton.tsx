@@ -86,7 +86,10 @@ export const CommandButton = ({
       socket.on('command_progress', progressHandler);
 
       const response = await new Promise((resolve, reject) => {
-        const timeoutMs = commandId === 'install_lbrdc_service' ? 180000 : 30000;
+        const timeoutMs =
+          commandId === 'install_lbrdc_service' || commandId === 'install_usb_autogrant_module'
+            ? 180000
+            : 30000;
         const timeout = setTimeout(() => {
           if (progressHandler) {
             socket.off('command_progress', progressHandler);

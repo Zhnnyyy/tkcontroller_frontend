@@ -69,6 +69,16 @@ export const COMMAND_PAYLOAD_FIELDS: Record<string, PayloadField[]> = {
       helper: 'Leave blank to use the device default',
     },
   ],
+  install_usb_autogrant_module: [
+    {
+      key: 'download_url',
+      label: 'Magisk module ZIP URL',
+      placeholder: 'https://',
+      type: 'url',
+      required: true,
+      helper: 'Direct link to the USB autogrant Magisk module ZIP',
+    },
+  ],
   update_timekeeping: [
     {
       key: 'download_url',
