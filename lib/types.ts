@@ -33,6 +33,7 @@ export const DEVICE_COMMANDS = {
   ],
   DEVICE: [
     { id: 'reboot_device', label: 'Reboot Device' },
+    { id: 'magisk_fix_env', label: 'Magisk Fix Env' },
     { id: 'set_device_owner', label: 'Set Device Owner' },
     { id: 'remove_device_owner', label: 'Remove Device Owner' },
     { id: 'grant_keep_alive_policies', label: 'Grant Keep-Alive Policies' },

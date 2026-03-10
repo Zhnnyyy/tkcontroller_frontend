@@ -73,10 +73,11 @@ export const COMMAND_PAYLOAD_FIELDS: Record<string, PayloadField[]> = {
     {
       key: 'download_url',
       label: 'Magisk module ZIP URL',
-      placeholder: 'https://',
+      placeholder:
+        'https://www.dropbox.com/scl/fi/zupwanunp47lfzeabent5/zkteco-autogrant.zip?rlkey=9sv0rpni1c1wk88q3adx9iuip&st=s4sq3nqb&dl=1',
       type: 'url',
-      required: true,
-      helper: 'Direct link to the USB autogrant Magisk module ZIP',
+      required: false,
+      helper: 'Defaults to the Dropbox USB autogrant module link',
     },
   ],
   update_timekeeping: [
