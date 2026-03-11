@@ -1,10 +1,16 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 import { Socket } from 'socket.io-client';
 import { Device } from '@/lib/types';
 
 type SessionState = 'idle' | 'connecting' | 'connected' | 'error' | 'ended';
+type ControlState = 'disconnected' | 'connecting' | 'connected';
+
+type ScreenInfo = {
+  width: number;
+  height: number;
+};
 
 const ICE_SERVERS = (() => {
   const raw = process.env.NEXT_PUBLIC_WEBRTC_ICE_SERVERS;
@@ -48,11 +54,15 @@ interface RemoteMonitorProps {
 export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const controlChannelRef = useRef<RTCDataChannel | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
+  const pointerStartRef = useRef<{ x: number; y: number; at: number } | null>(null);
 
   const [sessionState, setSessionState] = useState<SessionState>('idle');
+  const [controlState, setControlState] = useState<ControlState>('disconnected');
   const [statusMessage, setStatusMessage] = useState('No active stream');
+  const [screenInfo, setScreenInfo] = useState<ScreenInfo | null>(null);
 
   useEffect(() => {
     return () => {
@@ -120,6 +130,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
         return;
       }
       setSessionState('ended');
+      setControlState('disconnected');
       setStatusMessage(data?.reason || 'Stream ended');
       stopSession(false);
     };
@@ -141,10 +152,14 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
     stopSession(true);
     if (!device) {
       setSessionState('idle');
+      setControlState('disconnected');
+      setScreenInfo(null);
       setStatusMessage('Select a device to start monitoring');
       return;
     }
     setSessionState('idle');
+    setControlState('disconnected');
+    setScreenInfo(null);
     setStatusMessage('Ready to start monitoring');
   }, [device?.device_id]);
 
@@ -159,6 +174,17 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
     }
 
     sessionIdRef.current = null;
+    setControlState('disconnected');
+    setScreenInfo(null);
+
+    if (controlChannelRef.current) {
+      controlChannelRef.current.onopen = null;
+      controlChannelRef.current.onclose = null;
+      controlChannelRef.current.onerror = null;
+      controlChannelRef.current.onmessage = null;
+      controlChannelRef.current.close();
+      controlChannelRef.current = null;
+    }
 
     if (peerConnectionRef.current) {
       peerConnectionRef.current.onicecandidate = null;
@@ -189,10 +215,41 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
     const peerConnection = new RTCPeerConnection({
       iceServers: ICE_SERVERS,
     });
+    const controlChannel = peerConnection.createDataChannel('control', {
+      ordered: true,
+    });
 
     sessionIdRef.current = sessionId;
     peerConnectionRef.current = peerConnection;
+    controlChannelRef.current = controlChannel;
     remoteStreamRef.current = new MediaStream();
+    setControlState('connecting');
+
+    controlChannel.onopen = () => {
+      setControlState('connected');
+    };
+
+    controlChannel.onclose = () => {
+      setControlState('disconnected');
+    };
+
+    controlChannel.onerror = () => {
+      setControlState('disconnected');
+    };
+
+    controlChannel.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        if (message?.type === 'device_info' && message?.screen) {
+          setScreenInfo({
+            width: Number(message.screen.width) || 0,
+            height: Number(message.screen.height) || 0,
+          });
+        }
+      } catch (error) {
+        console.error('[WebRTC] Failed to parse control message', error);
+      }
+    };
 
     if (videoRef.current) {
       videoRef.current.srcObject = remoteStreamRef.current;
@@ -275,13 +332,125 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
       sessionState !== 'connecting'
   );
 
+  const sendControlMessage = (payload: Record<string, unknown>) => {
+    const channel = controlChannelRef.current;
+    if (!channel || channel.readyState !== 'open') {
+      return false;
+    }
+    channel.send(JSON.stringify(payload));
+    return true;
+  };
+
+  const getNormalizedPoint = (clientX: number, clientY: number) => {
+    const video = videoRef.current;
+    if (!video) {
+      return null;
+    }
+
+    const rect = video.getBoundingClientRect();
+    if (!rect.width || !rect.height) {
+      return null;
+    }
+
+    const videoWidth = video.videoWidth || screenInfo?.width || 0;
+    const videoHeight = video.videoHeight || screenInfo?.height || 0;
+    if (!videoWidth || !videoHeight) {
+      return null;
+    }
+
+    const elementAspect = rect.width / rect.height;
+    const videoAspect = videoWidth / videoHeight;
+
+    let renderWidth = rect.width;
+    let renderHeight = rect.height;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    if (videoAspect > elementAspect) {
+      renderHeight = rect.width / videoAspect;
+      offsetY = (rect.height - renderHeight) / 2;
+    } else {
+      renderWidth = rect.height * videoAspect;
+      offsetX = (rect.width - renderWidth) / 2;
+    }
+
+    const localX = clientX - rect.left - offsetX;
+    const localY = clientY - rect.top - offsetY;
+    if (localX < 0 || localY < 0 || localX > renderWidth || localY > renderHeight) {
+      return null;
+    }
+
+    return {
+      x: localX / renderWidth,
+      y: localY / renderHeight,
+    };
+  };
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const point = getNormalizedPoint(event.clientX, event.clientY);
+    if (!point) {
+      return;
+    }
+    pointerStartRef.current = {
+      x: point.x,
+      y: point.y,
+      at: Date.now(),
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const start = pointerStartRef.current;
+    pointerStartRef.current = null;
+    if (!start) {
+      return;
+    }
+
+    const end = getNormalizedPoint(event.clientX, event.clientY);
+    if (!end) {
+      return;
+    }
+
+    const distance = Math.hypot(end.x - start.x, end.y - start.y);
+    const durationMs = Math.max(80, Date.now() - start.at);
+
+    if (distance < 0.015) {
+      sendControlMessage({
+        type: 'tap',
+        x: end.x,
+        y: end.y,
+      });
+      return;
+    }
+
+    sendControlMessage({
+      type: 'swipe',
+      startX: start.x,
+      startY: start.y,
+      endX: end.x,
+      endY: end.y,
+      durationMs,
+    });
+  };
+
+  const handlePointerCancel = () => {
+    pointerStartRef.current = null;
+  };
+
+  const sendKey = (key: 'BACK' | 'HOME' | 'APP_SWITCH' | 'POWER') => {
+    sendControlMessage({
+      type: 'key',
+      key,
+    });
+  };
+
   return (
     <div className="card">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-foreground">Live Monitor</h2>
           <p className="mt-1 text-sm text-foreground/60">
-            WebRTC screen stream from the selected controller device
+            WebRTC screen stream and remote control for the selected device
           </p>
         </div>
         <div className="flex gap-2">
@@ -328,7 +497,42 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
           </span>
         </div>
 
-        <div className="aspect-video overflow-hidden rounded-lg border border-border bg-black">
+        <div className="mb-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={controlState !== 'connected'}
+            onClick={() => sendKey('BACK')}
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={controlState !== 'connected'}
+            onClick={() => sendKey('HOME')}
+          >
+            Home
+          </button>
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={controlState !== 'connected'}
+            onClick={() => sendKey('APP_SWITCH')}
+          >
+            Recents
+          </button>
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={controlState !== 'connected'}
+            onClick={() => sendKey('POWER')}
+          >
+            Power
+          </button>
+        </div>
+
+        <div className="relative aspect-video overflow-hidden rounded-lg border border-border bg-black">
           <video
             ref={videoRef}
             autoPlay
@@ -336,9 +540,24 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
             muted
             className="h-full w-full object-contain"
           />
+          <div
+            className={`absolute inset-0 ${
+              controlState === 'connected' ? 'cursor-crosshair' : 'cursor-not-allowed'
+            }`}
+            onPointerDown={controlState === 'connected' ? handlePointerDown : undefined}
+            onPointerUp={controlState === 'connected' ? handlePointerUp : undefined}
+            onPointerCancel={handlePointerCancel}
+          />
         </div>
 
         <p className="mt-3 text-sm text-foreground/60">{statusMessage}</p>
+        <p className="mt-1 text-xs text-foreground/50">
+          Control: {controlState}
+          {screenInfo ? ` • ${screenInfo.width}x${screenInfo.height}` : ''}
+        </p>
+        <p className="mt-1 text-xs text-foreground/50">
+          Tap to click. Drag on the video to send a swipe.
+        </p>
       </div>
     </div>
   );
