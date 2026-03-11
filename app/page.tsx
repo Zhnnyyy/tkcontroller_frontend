@@ -9,6 +9,7 @@ import { ConnectionStatus } from '@/components/ConnectionStatus';
 import { CommandExecutionState } from '@/lib/types';
 import { Settings, RotateCcw } from 'lucide-react';
 import { useAuth } from '@/components/AuthGate';
+import { RemoteMonitor } from '@/components/RemoteMonitor';
 
 export default function Home() {
   const { logout, session } = useAuth();
@@ -32,6 +33,9 @@ export default function Home() {
       socket.emit('get_devices');
     }
   };
+
+  const selectedDevice =
+    devices.find((device) => device.device_id === selectedDeviceId) ?? null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -101,6 +105,8 @@ export default function Home() {
 
           {/* Main Panel */}
           <div className="lg:col-span-2 space-y-8">
+            <RemoteMonitor socket={socket} device={selectedDevice} />
+
             {/* Commands Section */}
             <section>
               <h2 className="text-xl font-bold text-foreground mb-4">
