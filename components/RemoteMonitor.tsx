@@ -39,6 +39,20 @@ const ICE_SERVERS = (() => {
   return [{ urls: ['stun:stun.l.google.com:19302'] }];
 })();
 
+function getCandidateType(candidate: string | undefined) {
+  if (!candidate) {
+    return 'unknown';
+  }
+
+  const parts = candidate.trim().split(/\s+/);
+  const typeIndex = parts.indexOf('typ');
+  if (typeIndex >= 0 && parts[typeIndex + 1]) {
+    return parts[typeIndex + 1];
+  }
+
+  return 'unknown';
+}
+
 function createSessionId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID();
@@ -101,6 +115,9 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
       }
 
       try {
+        console.info('[WebRTC] Remote ICE candidate', {
+          type: getCandidateType(data?.candidate?.candidate),
+        });
         await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
       } catch (error) {
         console.error('[WebRTC] Failed to add remote ICE candidate', error);
@@ -275,6 +292,9 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
       if (!event.candidate || !sessionIdRef.current) {
         return;
       }
+      console.info('[WebRTC] Local ICE candidate', {
+        type: getCandidateType(event.candidate.candidate),
+      });
       socket.emit('webrtc_ice_candidate', {
         session_id: sessionIdRef.current,
         device_id: device.device_id,
@@ -284,6 +304,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
 
     peerConnection.onconnectionstatechange = () => {
       const state = peerConnection.connectionState;
+      console.info('[WebRTC] Connection state', state);
       if (state === 'failed') {
         setSessionState('error');
         setStatusMessage('Peer connection failed');
@@ -306,6 +327,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
           session_id: sessionId,
           device_id: device.device_id,
           description: peerConnection.localDescription,
+          ice_servers: ICE_SERVERS,
         },
         (response: any) => {
           if (response?.status !== 'success') {
