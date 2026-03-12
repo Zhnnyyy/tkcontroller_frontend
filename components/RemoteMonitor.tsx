@@ -26,6 +26,7 @@ interface RemoteMonitorProps {
 
 export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const monitorContainerRef = useRef<HTMLDivElement | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const pointerStartRef = useRef<{ x: number; y: number; at: number } | null>(null);
 
@@ -34,6 +35,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
   const [statusMessage, setStatusMessage] = useState('No active stream');
   const [screenInfo, setScreenInfo] = useState<ScreenInfo | null>(null);
   const [frameSrc, setFrameSrc] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     if (!socket) {
@@ -122,6 +124,17 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
       socket.off('monitor_stop', handleStop);
     };
   }, [socket]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === monitorContainerRef.current);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
 
   useEffect(() => {
     stopSession(true, 'viewer_switch_device');
@@ -311,6 +324,20 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
     });
   };
 
+  const toggleFullscreen = async () => {
+    const monitorContainer = monitorContainerRef.current;
+    if (!monitorContainer) {
+      return;
+    }
+
+    if (document.fullscreenElement === monitorContainer) {
+      await document.exitFullscreen();
+      return;
+    }
+
+    await monitorContainer.requestFullscreen();
+  };
+
   return (
     <div className="card">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -328,6 +355,15 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
             disabled={!canStart}
           >
             {sessionState === 'connecting' ? 'Connecting...' : 'Start Stream'}
+          </button>
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => {
+              void toggleFullscreen();
+            }}
+          >
+            {isFullscreen ? 'Exit Big Screen' : 'Big Screen'}
           </button>
           <button
             type="button"
@@ -399,7 +435,12 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
           </button>
         </div>
 
-        <div className="relative aspect-video overflow-hidden rounded-lg border border-border bg-black">
+        <div
+          ref={monitorContainerRef}
+          className={`relative aspect-video overflow-hidden rounded-lg border border-border bg-black ${
+            isFullscreen ? 'flex h-screen w-screen items-center justify-center rounded-none border-0' : ''
+          }`}
+        >
           {frameSrc ? (
             <img
               ref={imageRef}
