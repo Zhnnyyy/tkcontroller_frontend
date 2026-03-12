@@ -2,7 +2,7 @@ import { io, Socket } from 'socket.io-client';
 
 let socket: Socket | null = null;
 
-export const initializeSocket = (url: string = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3002') => {
+export const initializeSocket = (url: string = 'https://tkcontroller-backend.onrender.com') => {
   if (socket) return socket;
 
   socket = io(url, {

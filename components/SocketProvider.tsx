@@ -48,7 +48,7 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
   const [devices, setDevices] = useState<Device[]>([]);
 
   useEffect(() => {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+    const backendUrl = 'https://tkcontroller-backend.onrender.com';
     const newSocket = initializeSocket(backendUrl);
 
     newSocket.on('connect', () => {

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 import { Socket } from 'socket.io-client';
@@ -11,47 +11,6 @@ type ScreenInfo = {
   width: number;
   height: number;
 };
-
-const ICE_SERVERS = (() => {
-  const raw = process.env.NEXT_PUBLIC_WEBRTC_ICE_SERVERS;
-  if (!raw) {
-    return [{ urls: ['stun:stun.l.google.com:19302'] }];
-  }
-
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      return parsed;
-    }
-    if (parsed && typeof parsed === 'object') {
-      return [parsed];
-    }
-  } catch {
-    const urls = raw
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean);
-    if (urls.length > 0) {
-      return [{ urls }];
-    }
-  }
-
-  return [{ urls: ['stun:stun.l.google.com:19302'] }];
-})();
-
-function getCandidateType(candidate: string | undefined) {
-  if (!candidate) {
-    return 'unknown';
-  }
-
-  const parts = candidate.trim().split(/\s+/);
-  const typeIndex = parts.indexOf('typ');
-  if (typeIndex >= 0 && parts[typeIndex + 1]) {
-    return parts[typeIndex + 1];
-  }
-
-  return 'unknown';
-}
 
 function createSessionId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -66,65 +25,59 @@ interface RemoteMonitorProps {
 }
 
 export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const controlChannelRef = useRef<RTCDataChannel | null>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
   const sessionIdRef = useRef<string | null>(null);
-  const remoteStreamRef = useRef<MediaStream | null>(null);
   const pointerStartRef = useRef<{ x: number; y: number; at: number } | null>(null);
 
   const [sessionState, setSessionState] = useState<SessionState>('idle');
   const [controlState, setControlState] = useState<ControlState>('disconnected');
   const [statusMessage, setStatusMessage] = useState('No active stream');
   const [screenInfo, setScreenInfo] = useState<ScreenInfo | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
-    };
-  }, []);
+  const [frameSrc, setFrameSrc] = useState<string | null>(null);
 
   useEffect(() => {
     if (!socket) {
       return undefined;
     }
 
-    const handleAnswer = async (data: any) => {
-      if (data?.session_id !== sessionIdRef.current || !peerConnectionRef.current) {
+    const handleFrame = (data: any) => {
+      if (data?.session_id !== sessionIdRef.current) {
         return;
       }
 
-      try {
-        await peerConnectionRef.current.setRemoteDescription(
-          new RTCSessionDescription(data.description)
-        );
-        setSessionState('connecting');
-        setStatusMessage('Awaiting media track');
-      } catch (error) {
-        console.error('[WebRTC] Failed to apply remote description', error);
-        setSessionState('error');
-        setStatusMessage('Failed to apply remote answer');
+      const frame = data?.frame;
+      if (!frame?.image) {
+        return;
+      }
+
+      const mimeType = frame?.mime_type || 'image/png';
+      setFrameSrc(`data:${mimeType};base64,${frame.image}`);
+      setSessionState('connected');
+      setControlState('connected');
+      setStatusMessage('Live stream active');
+
+      const width = Number(frame?.width) || 0;
+      const height = Number(frame?.height) || 0;
+      if (width > 0 && height > 0) {
+        setScreenInfo({ width, height });
       }
     };
 
-    const handleIceCandidate = async (data: any) => {
-      if (data?.session_id !== sessionIdRef.current || !peerConnectionRef.current) {
+    const handleInfo = (data: any) => {
+      if (data?.session_id !== sessionIdRef.current) {
         return;
       }
 
-      try {
-        console.info('[WebRTC] Remote ICE candidate', {
-          type: getCandidateType(data?.candidate?.candidate),
+      const screen = data?.info?.screen;
+      if (screen) {
+        setScreenInfo({
+          width: Number(screen.width) || 0,
+          height: Number(screen.height) || 0,
         });
-        await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
-      } catch (error) {
-        console.error('[WebRTC] Failed to add remote ICE candidate', error);
       }
     };
 
-    const handleSessionState = (data: any) => {
+    const handleState = (data: any) => {
       if (data?.session_id !== sessionIdRef.current) {
         return;
       }
@@ -139,89 +92,71 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
       }
 
       setSessionState(state === 'error' ? 'error' : 'ended');
-      stopSession(false);
+      setControlState('disconnected');
+      if (state !== 'connected') {
+        setFrameSrc(null);
+      }
     };
 
-    const handleHangup = (data: any) => {
+    const handleStop = (data: any) => {
       if (data?.session_id !== sessionIdRef.current) {
         return;
       }
+
       setSessionState('ended');
       setControlState('disconnected');
       setStatusMessage(data?.reason || 'Stream ended');
-      stopSession(false);
+      setFrameSrc(null);
+      sessionIdRef.current = null;
     };
 
-    socket.on('webrtc_answer', handleAnswer);
-    socket.on('webrtc_ice_candidate', handleIceCandidate);
-    socket.on('webrtc_session_state', handleSessionState);
-    socket.on('webrtc_hangup', handleHangup);
+    socket.on('monitor_frame', handleFrame);
+    socket.on('monitor_info', handleInfo);
+    socket.on('monitor_state', handleState);
+    socket.on('monitor_stop', handleStop);
 
     return () => {
-      socket.off('webrtc_answer', handleAnswer);
-      socket.off('webrtc_ice_candidate', handleIceCandidate);
-      socket.off('webrtc_session_state', handleSessionState);
-      socket.off('webrtc_hangup', handleHangup);
+      socket.off('monitor_frame', handleFrame);
+      socket.off('monitor_info', handleInfo);
+      socket.off('monitor_state', handleState);
+      socket.off('monitor_stop', handleStop);
     };
   }, [socket]);
 
   useEffect(() => {
-    stopSession(true);
+    stopSession(true, 'viewer_switch_device');
     if (!device) {
       setSessionState('idle');
       setControlState('disconnected');
       setScreenInfo(null);
+      setFrameSrc(null);
       setStatusMessage('Select a device to start monitoring');
       return;
     }
     setSessionState('idle');
     setControlState('disconnected');
     setScreenInfo(null);
+    setFrameSrc(null);
     setStatusMessage('Ready to start monitoring');
   }, [device?.device_id]);
 
-  const stopSession = (notifyServer: boolean) => {
+  const stopSession = (notifyServer: boolean, reason = 'viewer_stop') => {
     const activeSessionId = sessionIdRef.current;
     if (notifyServer && socket && activeSessionId && device?.device_id) {
-      socket.emit('webrtc_hangup', {
+      socket.emit('monitor_stop', {
         session_id: activeSessionId,
         device_id: device.device_id,
-        reason: 'viewer_stop',
+        reason,
       });
     }
 
     sessionIdRef.current = null;
     setControlState('disconnected');
     setScreenInfo(null);
-
-    if (controlChannelRef.current) {
-      controlChannelRef.current.onopen = null;
-      controlChannelRef.current.onclose = null;
-      controlChannelRef.current.onerror = null;
-      controlChannelRef.current.onmessage = null;
-      controlChannelRef.current.close();
-      controlChannelRef.current = null;
-    }
-
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.onicecandidate = null;
-      peerConnectionRef.current.ontrack = null;
-      peerConnectionRef.current.onconnectionstatechange = null;
-      peerConnectionRef.current.close();
-      peerConnectionRef.current = null;
-    }
-
-    if (remoteStreamRef.current) {
-      remoteStreamRef.current.getTracks().forEach((track) => track.stop());
-      remoteStreamRef.current = null;
-    }
-
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
+    setFrameSrc(null);
   };
 
-  const startSession = async () => {
+  const startSession = () => {
     if (!socket || !device?.device_id) {
       return;
     }
@@ -229,122 +164,28 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
     stopSession(false);
 
     const sessionId = createSessionId();
-    const peerConnection = new RTCPeerConnection({
-      iceServers: ICE_SERVERS,
-    });
-    const controlChannel = peerConnection.createDataChannel('control', {
-      ordered: true,
-    });
-
     sessionIdRef.current = sessionId;
-    peerConnectionRef.current = peerConnection;
-    controlChannelRef.current = controlChannel;
-    remoteStreamRef.current = new MediaStream();
-    setControlState('connecting');
-
-    controlChannel.onopen = () => {
-      setControlState('connected');
-    };
-
-    controlChannel.onclose = () => {
-      setControlState('disconnected');
-    };
-
-    controlChannel.onerror = () => {
-      setControlState('disconnected');
-    };
-
-    controlChannel.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        if (message?.type === 'device_info' && message?.screen) {
-          setScreenInfo({
-            width: Number(message.screen.width) || 0,
-            height: Number(message.screen.height) || 0,
-          });
-        }
-      } catch (error) {
-        console.error('[WebRTC] Failed to parse control message', error);
-      }
-    };
-
-    if (videoRef.current) {
-      videoRef.current.srcObject = remoteStreamRef.current;
-    }
-
-    peerConnection.addTransceiver('video', { direction: 'recvonly' });
-
-    peerConnection.ontrack = (event) => {
-      const stream = remoteStreamRef.current;
-      event.streams[0]?.getTracks().forEach((track) => {
-        if (!stream?.getTracks().find((existing) => existing.id === track.id)) {
-          stream?.addTrack(track);
-        }
-      });
-      if (videoRef.current && stream) {
-        videoRef.current.srcObject = stream;
-      }
-      setSessionState('connected');
-      setStatusMessage('Live stream active');
-    };
-
-    peerConnection.onicecandidate = (event) => {
-      if (!event.candidate || !sessionIdRef.current) {
-        return;
-      }
-      console.info('[WebRTC] Local ICE candidate', {
-        type: getCandidateType(event.candidate.candidate),
-      });
-      socket.emit('webrtc_ice_candidate', {
-        session_id: sessionIdRef.current,
-        device_id: device.device_id,
-        candidate: event.candidate.toJSON(),
-      });
-    };
-
-    peerConnection.onconnectionstatechange = () => {
-      const state = peerConnection.connectionState;
-      console.info('[WebRTC] Connection state', state);
-      if (state === 'failed') {
-        setSessionState('error');
-        setStatusMessage('Peer connection failed');
-      } else if (state === 'disconnected' || state === 'closed') {
-        setSessionState('ended');
-        setStatusMessage('Peer connection closed');
-      }
-    };
-
     setSessionState('connecting');
-    setStatusMessage('Creating WebRTC offer');
+    setControlState('connecting');
+    setStatusMessage('Requesting device stream');
 
-    try {
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
-
-      socket.emit(
-        'webrtc_offer',
-        {
-          session_id: sessionId,
-          device_id: device.device_id,
-          description: peerConnection.localDescription,
-          ice_servers: ICE_SERVERS,
-        },
-        (response: any) => {
-          if (response?.status !== 'success') {
-            setSessionState('error');
-            setStatusMessage(response?.message || 'Failed to send offer');
-            stopSession(false);
-            return;
-          }
-          setStatusMessage('Offer sent to device');
+    socket.emit(
+      'monitor_start',
+      {
+        session_id: sessionId,
+        device_id: device.device_id,
+      },
+      (response: any) => {
+        if (response?.status !== 'success') {
+          setSessionState('error');
+          setControlState('disconnected');
+          setStatusMessage(response?.message || 'Failed to start stream');
+          sessionIdRef.current = null;
+          return;
         }
-      );
-    } catch (error) {
-      console.error('[WebRTC] Failed to start session', error);
-      setSessionState('error');
-      setStatusMessage('Failed to start WebRTC session');
-      stopSession(false);
-    }
+        setStatusMessage('Waiting for device frames');
+      }
+    );
   };
 
   const canStart = Boolean(
@@ -355,44 +196,48 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
   );
 
   const sendControlMessage = (payload: Record<string, unknown>) => {
-    const channel = controlChannelRef.current;
-    if (!channel || channel.readyState !== 'open') {
+    if (!socket || !sessionIdRef.current || !device?.device_id) {
       return false;
     }
-    channel.send(JSON.stringify(payload));
+
+    socket.emit('monitor_control', {
+      session_id: sessionIdRef.current,
+      device_id: device.device_id,
+      payload,
+    });
     return true;
   };
 
   const getNormalizedPoint = (clientX: number, clientY: number) => {
-    const video = videoRef.current;
-    if (!video) {
+    const image = imageRef.current;
+    if (!image) {
       return null;
     }
 
-    const rect = video.getBoundingClientRect();
+    const rect = image.getBoundingClientRect();
     if (!rect.width || !rect.height) {
       return null;
     }
 
-    const videoWidth = video.videoWidth || screenInfo?.width || 0;
-    const videoHeight = video.videoHeight || screenInfo?.height || 0;
-    if (!videoWidth || !videoHeight) {
+    const imageWidth = image.naturalWidth || screenInfo?.width || 0;
+    const imageHeight = image.naturalHeight || screenInfo?.height || 0;
+    if (!imageWidth || !imageHeight) {
       return null;
     }
 
     const elementAspect = rect.width / rect.height;
-    const videoAspect = videoWidth / videoHeight;
+    const imageAspect = imageWidth / imageHeight;
 
     let renderWidth = rect.width;
     let renderHeight = rect.height;
     let offsetX = 0;
     let offsetY = 0;
 
-    if (videoAspect > elementAspect) {
-      renderHeight = rect.width / videoAspect;
+    if (imageAspect > elementAspect) {
+      renderHeight = rect.width / imageAspect;
       offsetY = (rect.height - renderHeight) / 2;
     } else {
-      renderWidth = rect.height * videoAspect;
+      renderWidth = rect.height * imageAspect;
       offsetX = (rect.width - renderWidth) / 2;
     }
 
@@ -472,7 +317,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
         <div>
           <h2 className="text-xl font-bold text-foreground">Live Monitor</h2>
           <p className="mt-1 text-sm text-foreground/60">
-            WebRTC screen stream and remote control for the selected device
+            Socket-relayed screen stream and remote control for the selected device
           </p>
         </div>
         <div className="flex gap-2">
@@ -555,13 +400,19 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
         </div>
 
         <div className="relative aspect-video overflow-hidden rounded-lg border border-border bg-black">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="h-full w-full object-contain"
-          />
+          {frameSrc ? (
+            <img
+              ref={imageRef}
+              src={frameSrc}
+              alt="Remote device screen"
+              className="h-full w-full object-contain"
+              draggable={false}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-sm text-white/60">
+              No frame received yet
+            </div>
+          )}
           <div
             className={`absolute inset-0 ${
               controlState === 'connected' ? 'cursor-crosshair' : 'cursor-not-allowed'
@@ -575,10 +426,10 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
         <p className="mt-3 text-sm text-foreground/60">{statusMessage}</p>
         <p className="mt-1 text-xs text-foreground/50">
           Control: {controlState}
-          {screenInfo ? ` • ${screenInfo.width}x${screenInfo.height}` : ''}
+          {screenInfo ? ` | ${screenInfo.width}x${screenInfo.height}` : ''}
         </p>
         <p className="mt-1 text-xs text-foreground/50">
-          Tap to click. Drag on the video to send a swipe.
+          Tap to click. Drag on the stream to send a swipe.
         </p>
       </div>
     </div>
