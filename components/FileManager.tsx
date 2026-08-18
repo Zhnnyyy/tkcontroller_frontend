@@ -34,6 +34,11 @@ export function FileManager({ socket, device }: FileManagerProps) {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pathToInput, setPathToInput] = useState(currentPath);
+
+  useEffect(() => {
+    setPathToInput(currentPath);
+  }, [currentPath]);
 
   const formatBytes = (bytes: number, decimals = 2) => {
     if (bytes === 0) return '0 Bytes';
@@ -232,8 +237,6 @@ export function FileManager({ socket, device }: FileManagerProps) {
     );
   }
 
-  const isAtRoot = currentPath === '/' || currentPath === '/sdcard/';
-
   return (
     <div className="card">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
@@ -278,20 +281,37 @@ export function FileManager({ socket, device }: FileManagerProps) {
         </div>
       </div>
 
-      {/* Path Breadcrumbs */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-input rounded-lg border border-border mb-4 overflow-x-auto whitespace-nowrap">
+      {/* Path Input Bar */}
+      <div className="flex items-center gap-2 px-3 py-2 bg-input rounded-lg border border-border mb-4">
         <button
           type="button"
           onClick={handleGoBack}
-          disabled={isAtRoot || loading}
+          disabled={loading}
           className="p-1 hover:bg-background rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           aria-label="Go back"
         >
           <ArrowLeft className="w-4 h-4 text-foreground" />
         </button>
-        <span className="text-xs font-mono text-foreground/75 font-semibold select-all">
-          {currentPath}
-        </span>
+        <input
+          type="text"
+          value={pathToInput}
+          onChange={(e) => setPathToInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              fetchFiles(pathToInput);
+            }
+          }}
+          disabled={loading}
+          className="flex-1 bg-transparent border-0 outline-none text-xs font-mono text-foreground font-semibold focus:ring-0 p-0"
+        />
+        <button
+          type="button"
+          onClick={() => fetchFiles(pathToInput)}
+          disabled={loading}
+          className="bg-primary hover:opacity-90 text-primary-foreground text-xs py-1 px-3 rounded-md transition-all font-medium"
+        >
+          Go
+        </button>
       </div>
 
       {error && (
