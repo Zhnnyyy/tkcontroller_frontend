@@ -25,11 +25,13 @@ export function Terminal({ socket, device }: TerminalProps) {
   const [cmdHistory, setCmdHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   
-  const outputEndRef = useRef<HTMLDivElement>(null);
+  const consoleRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    outputEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (consoleRef.current) {
+      consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
+    }
   }, [history]);
 
   useEffect(() => {
@@ -156,6 +158,7 @@ export function Terminal({ socket, device }: TerminalProps) {
 
       {/* Terminal Screen */}
       <div 
+        ref={consoleRef}
         className="flex-1 bg-black border border-border/80 rounded-lg p-4 font-mono text-xs overflow-y-auto text-green-400 space-y-2 select-text"
         onClick={() => inputRef.current?.focus()}
       >
@@ -193,7 +196,6 @@ export function Terminal({ socket, device }: TerminalProps) {
             <span>Executing...</span>
           </div>
         )}
-        <div ref={outputEndRef} />
       </div>
 
       {/* Input Prompt bar */}
