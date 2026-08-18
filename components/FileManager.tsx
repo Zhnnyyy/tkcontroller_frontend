@@ -12,6 +12,7 @@ import {
   Loader2,
   AlertCircle,
   FolderOpen,
+  Trash2,
 } from 'lucide-react';
 import { Device } from '@/lib/types';
 
@@ -306,6 +307,43 @@ export function FileManager({ socket, device }: FileManagerProps) {
     }
   };
 
+  const handleDelete = (file: RemoteFile) => {
+    if (!socket || !device?.device_id) return;
+
+    const fullPath = currentPath.endsWith('/')
+      ? `${currentPath}${file.name}`
+      : `${currentPath}/${file.name}`;
+
+    const confirmMessage = file.is_dir
+      ? `Are you sure you want to permanently delete the folder "${file.name}" and all of its contents?`
+      : `Are you sure you want to delete the file "${file.name}"?`;
+
+    if (!window.confirm(confirmMessage)) return;
+
+    const localCommandId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setLoading(true);
+
+    socket.emit(
+      'send_command',
+      {
+        deviceId: device.device_id,
+        device_id: device.device_id,
+        command: 'delete_file',
+        command_id: localCommandId,
+        payload: { path: fullPath },
+      },
+      (response: any) => {
+        setLoading(false);
+        const devResp = response?.response;
+        if (devResp?.status === 'success') {
+          fetchFiles(currentPath);
+        } else {
+          alert('Delete failed: ' + (devResp?.message || 'Unknown error'));
+        }
+      }
+    );
+  };
+
   if (!device) {
     return (
       <div className="card min-h-64 flex items-center justify-center border-dashed">
@@ -498,17 +536,28 @@ export function FileManager({ socket, device }: FileManagerProps) {
                       {formatDate(file.last_modified)}
                     </td>
                     <td className="p-3 text-right">
-                      {!file.is_dir && (
+                      <div className="flex items-center justify-end gap-1.5">
+                        {!file.is_dir && (
+                          <button
+                            type="button"
+                            className="p-1.5 hover:bg-input rounded-lg transition-colors text-foreground/75 hover:text-foreground inline-flex items-center"
+                            onClick={() => handleDownload(file)}
+                            title="Download file"
+                            aria-label={`Download ${file.name}`}
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+                        )}
                         <button
                           type="button"
-                          className="p-1.5 hover:bg-input rounded-lg transition-colors text-foreground/75 hover:text-foreground inline-flex items-center"
-                          onClick={() => handleDownload(file)}
-                          title="Download file"
-                          aria-label={`Download ${file.name}`}
+                          className="p-1.5 hover:bg-error/15 rounded-lg transition-colors text-foreground/75 hover:text-error inline-flex items-center"
+                          onClick={() => handleDelete(file)}
+                          title="Delete"
+                          aria-label={`Delete ${file.name}`}
                         >
-                          <Download className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))
