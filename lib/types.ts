@@ -53,6 +53,16 @@ export const DEVICE_COMMANDS = {
     { id: 'tailscale_down', label: 'Tailscale Down' },
     { id: 'uninstall_tailscale', label: 'Uninstall Tailscale' },
   ],
+  SECURITY: [
+    { id: 'disable_status_bar', label: 'Disable Status Bar' },
+    { id: 'enable_status_bar', label: 'Enable Status Bar' },
+    { id: 'disable_keyguard', label: 'Disable Keyguard' },
+    { id: 'enable_keyguard', label: 'Enable Keyguard' },
+    { id: 'lock_hardware_buttons', label: 'Lock Hardware Buttons' },
+    { id: 'unlock_hardware_buttons', label: 'Unlock Hardware Buttons' },
+    { id: 'lock_usb_adb', label: 'Lock USB/ADB' },
+    { id: 'unlock_usb_adb', label: 'Unlock USB/ADB' },
+  ],
   HEALTH: [
     { id: 'check_device_health', label: 'Check Device Health' },
   ],
