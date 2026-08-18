@@ -35,6 +35,18 @@ export function FileManager({ socket, device }: FileManagerProps) {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pathToInput, setPathToInput] = useState(currentPath);
+  const [uploadProgress, setUploadProgress] = useState<{
+    fileName: string;
+    percent: number;
+    transferred: number;
+    total: number;
+  } | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState<{
+    fileName: string;
+    percent: number;
+    transferred: number;
+    total: number;
+  } | null>(null);
 
   useEffect(() => {
     setPathToInput(currentPath);
@@ -132,6 +144,36 @@ export function FileManager({ socket, device }: FileManagerProps) {
       : `${currentPath}/${file.name}`;
 
     const localCommandId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const chunks: string[] = [];
+
+    setDownloadProgress({
+      fileName: file.name,
+      percent: 0,
+      transferred: 0,
+      total: file.size,
+    });
+
+    const progressHandler = (progress: any) => {
+      if (
+        progress?.command_id !== localCommandId ||
+        progress?.command !== 'download_file' ||
+        progress?.device_id !== device.device_id
+      ) {
+        return;
+      }
+
+      if (progress.stage === 'chunk' && progress.chunk_data) {
+        chunks.push(progress.chunk_data);
+        setDownloadProgress({
+          fileName: file.name,
+          percent: progress.percent,
+          transferred: progress.downloaded_bytes,
+          total: progress.total_bytes,
+        });
+      }
+    };
+
+    socket.on('command_progress', progressHandler);
 
     socket.emit(
       'send_command',
@@ -143,17 +185,22 @@ export function FileManager({ socket, device }: FileManagerProps) {
         payload: { path: fullFilePath },
       },
       (response: any) => {
+        socket.off('command_progress', progressHandler);
+        setDownloadProgress(null);
+
         const devResp = response?.response;
-        if (devResp?.status === 'success' && devResp?.content) {
+        if (devResp?.status === 'success') {
           try {
-            const byteCharacters = atob(devResp.content);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-              byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: 'application/octet-stream' });
-            
+            const byteArrays = chunks.map((chunk) => {
+              const byteCharacters = atob(chunk);
+              const byteNumbers = new Array(byteCharacters.length);
+              for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+              }
+              return new Uint8Array(byteNumbers);
+            });
+            const blob = new Blob(byteArrays, { type: 'application/octet-stream' });
+
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
             link.download = file.name;
@@ -174,59 +221,89 @@ export function FileManager({ socket, device }: FileManagerProps) {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile || !socket || !device?.device_id) return;
 
     setUploading(true);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (!result) {
-        setUploading(false);
-        alert('Failed to read local file');
-        return;
+    setUploadProgress({
+      fileName: selectedFile.name,
+      percent: 0,
+      transferred: 0,
+      total: selectedFile.size,
+    });
+
+    const targetFilePath = currentPath.endsWith('/')
+      ? `${currentPath}${selectedFile.name}`
+      : `${currentPath}/${selectedFile.name}`;
+
+    const CHUNK_SIZE = 512 * 1024; // 512KB chunks
+    const totalChunks = Math.ceil(selectedFile.size / CHUNK_SIZE);
+
+    try {
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(selectedFile.size, start + CHUNK_SIZE);
+        const chunkBlob = selectedFile.slice(start, end);
+        const base64Chunk = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const result = event.target?.result as string;
+            if (result) {
+              resolve(result.split(',')[1]);
+            } else {
+              reject(new Error('FileReader returned empty result'));
+            }
+          };
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(chunkBlob);
+        });
+
+        const isLast = i === totalChunks - 1;
+        const localCommandId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+        const response: any = await new Promise((resolve) => {
+          socket.emit(
+            'send_command',
+            {
+              deviceId: device.device_id,
+              device_id: device.device_id,
+              command: 'upload_file',
+              command_id: localCommandId,
+              payload: {
+                path: targetFilePath,
+                content: base64Chunk,
+                chunk_index: i,
+                is_last: isLast,
+              },
+            },
+            (res: any) => resolve(res)
+          );
+        });
+
+        const devResp = response?.response;
+        if (devResp?.status !== 'success') {
+          throw new Error(devResp?.message || 'Chunk upload failed');
+        }
+
+        setUploadProgress({
+          fileName: selectedFile.name,
+          percent: Math.round(((i + 1) / totalChunks) * 100),
+          transferred: end,
+          total: selectedFile.size,
+        });
       }
 
-      // Result format is data:*/*;base64,.....
-      const base64Content = result.split(',')[1];
-      const targetFilePath = currentPath.endsWith('/')
-        ? `${currentPath}${selectedFile.name}`
-        : `${currentPath}/${selectedFile.name}`;
-
-      const localCommandId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-      socket.emit(
-        'send_command',
-        {
-          deviceId: device.device_id,
-          device_id: device.device_id,
-          command: 'upload_file',
-          command_id: localCommandId,
-          payload: {
-            path: targetFilePath,
-            content: base64Content,
-          },
-        },
-        (response: any) => {
-          setUploading(false);
-          if (fileInputRef.current) fileInputRef.current.value = '';
-          const devResp = response?.response;
-          if (devResp?.status === 'success') {
-            fetchFiles(currentPath);
-          } else {
-            alert('Upload failed: ' + (devResp?.message || 'Unknown error'));
-          }
-        }
-      );
-    };
-
-    reader.onerror = () => {
+      setUploadProgress(null);
       setUploading(false);
-      alert('File reading error');
-    };
-
-    reader.readAsDataURL(selectedFile);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      fetchFiles(currentPath);
+    } catch (err) {
+      setUploadProgress(null);
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      alert('Upload failed: ' + (err instanceof Error ? err.message : String(err)));
+    }
   };
 
   if (!device) {
@@ -313,6 +390,48 @@ export function FileManager({ socket, device }: FileManagerProps) {
           Go
         </button>
       </div>
+
+      {uploadProgress && (
+        <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg text-sm space-y-2">
+          <div className="flex justify-between font-medium text-xs text-foreground/80">
+            <span className="flex items-center gap-1.5">
+              <Upload className="w-3.5 h-3.5 text-primary animate-pulse" />
+              Uploading: <span className="font-semibold text-foreground truncate max-w-xs">{uploadProgress.fileName}</span>
+            </span>
+            <span>{uploadProgress.percent}%</span>
+          </div>
+          <div className="h-2 bg-input rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary transition-all duration-300"
+              style={{ width: `${uploadProgress.percent}%` }}
+            />
+          </div>
+          <div className="text-right text-[10px] text-foreground/50 font-mono">
+            {formatBytes(uploadProgress.transferred)} of {formatBytes(uploadProgress.total)}
+          </div>
+        </div>
+      )}
+
+      {downloadProgress && (
+        <div className="mb-4 p-3 bg-success/10 border border-success/20 rounded-lg text-sm space-y-2">
+          <div className="flex justify-between font-medium text-xs text-foreground/80">
+            <span className="flex items-center gap-1.5">
+              <Download className="w-3.5 h-3.5 text-success animate-pulse" />
+              Downloading: <span className="font-semibold text-foreground truncate max-w-xs">{downloadProgress.fileName}</span>
+            </span>
+            <span>{downloadProgress.percent}%</span>
+          </div>
+          <div className="h-2 bg-input rounded-full overflow-hidden">
+            <div
+              className="h-full bg-success transition-all duration-300"
+              style={{ width: `${downloadProgress.percent}%` }}
+            />
+          </div>
+          <div className="text-right text-[10px] text-foreground/50 font-mono">
+            {formatBytes(downloadProgress.transferred)} of {formatBytes(downloadProgress.total)}
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 p-3 bg-error/15 border border-error/30 text-error rounded-lg flex items-start gap-2 text-sm">
