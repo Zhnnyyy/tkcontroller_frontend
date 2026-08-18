@@ -17,6 +17,7 @@ const categoryIcons = {
   TAILSCALE: '🔗',
   HEALTH: '❤️',
   SECURITY: '🛡️',
+  DIAGNOSTICS: '🛠️',
 };
 
 export const CommandGrid = ({

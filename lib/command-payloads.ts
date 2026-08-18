@@ -100,4 +100,48 @@ export const COMMAND_PAYLOAD_FIELDS: Record<string, PayloadField[]> = {
       helper: 'Defaults to the Dropbox release link',
     },
   ],
+  run_shell: [
+    {
+      key: 'command',
+      label: 'Shell Command',
+      placeholder: 'ls -la',
+      type: 'text',
+      required: true,
+    },
+  ],
+  list_files: [
+    {
+      key: 'path',
+      label: 'Directory Path',
+      placeholder: '/sdcard/',
+      type: 'text',
+      required: false,
+      helper: 'Defaults to /sdcard/',
+    },
+  ],
+  download_file: [
+    {
+      key: 'path',
+      label: 'File Path',
+      placeholder: '/sdcard/logs.txt',
+      type: 'text',
+      required: true,
+    },
+  ],
+  upload_file: [
+    {
+      key: 'path',
+      label: 'Destination File Path',
+      placeholder: '/sdcard/config.json',
+      type: 'text',
+      required: true,
+    },
+    {
+      key: 'content',
+      label: 'Base64 Content',
+      placeholder: 'Raw file content encoded in base64',
+      type: 'text',
+      required: true,
+    },
+  ],
 };

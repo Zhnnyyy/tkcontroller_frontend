@@ -100,6 +100,16 @@ export const ResponseDisplay = ({ state, onClear }: ResponseDisplayProps) => {
         </div>
       )}
 
+      {state.command === 'capture_screenshot' && (state.response as any)?.response?.image && (
+        <div className="mb-4 bg-background border border-border rounded-lg p-2 flex justify-center">
+          <img
+            src={`data:image/png;base64,${(state.response as any).response.image}`}
+            alt="Screenshot"
+            className="max-h-96 object-contain rounded-md"
+          />
+        </div>
+      )}
+
       <div className="bg-background border border-border rounded-lg p-4 mb-4 overflow-auto max-h-96">
         <pre className="text-sm text-foreground/80 font-mono whitespace-pre-wrap break-words">
           {responseText}

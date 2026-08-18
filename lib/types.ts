@@ -66,4 +66,11 @@ export const DEVICE_COMMANDS = {
   HEALTH: [
     { id: 'check_device_health', label: 'Check Device Health' },
   ],
+  DIAGNOSTICS: [
+    { id: 'capture_screenshot', label: 'Capture Screenshot' },
+    { id: 'run_shell', label: 'Run Shell Command' },
+    { id: 'list_files', label: 'List Files' },
+    { id: 'download_file', label: 'Download File' },
+    { id: 'upload_file', label: 'Upload File' },
+  ],
 };
