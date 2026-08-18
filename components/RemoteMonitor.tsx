@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 import { Socket } from 'socket.io-client';
@@ -26,15 +26,19 @@ interface RemoteMonitorProps {
 
 export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const monitorContainerRef = useRef<HTMLDivElement | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const pointerStartRef = useRef<{ x: number; y: number; at: number } | null>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const dataChannelRef = useRef<RTCDataChannel | null>(null);
 
   const [sessionState, setSessionState] = useState<SessionState>('idle');
   const [controlState, setControlState] = useState<ControlState>('disconnected');
   const [statusMessage, setStatusMessage] = useState('No active stream');
   const [screenInfo, setScreenInfo] = useState<ScreenInfo | null>(null);
   const [frameSrc, setFrameSrc] = useState<string | null>(null);
+  const [webrtcStream, setWebrtcStream] = useState<MediaStream | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
@@ -109,19 +113,66 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
       setControlState('disconnected');
       setStatusMessage(data?.reason || 'Stream ended');
       setFrameSrc(null);
+      setWebrtcStream(null);
       sessionIdRef.current = null;
+    };
+
+    const handleWebRtcAnswer = async (data: any) => {
+      if (data?.session_id !== sessionIdRef.current || !peerConnectionRef.current) {
+        return;
+      }
+      try {
+        const desc = new RTCSessionDescription(data.description);
+        await peerConnectionRef.current.setRemoteDescription(desc);
+      } catch (err) {
+        console.error('Failed to set remote SDP answer', err);
+      }
+    };
+
+    const handleWebRtcIceCandidate = async (data: any) => {
+      if (
+        data?.session_id !== sessionIdRef.current ||
+        !peerConnectionRef.current ||
+        !data.candidate
+      ) {
+        return;
+      }
+      try {
+        await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
+      } catch (err) {
+        console.warn('Failed to add remote ICE candidate', err);
+      }
+    };
+
+    const handleWebRtcSessionState = (data: any) => {
+      if (data?.session_id !== sessionIdRef.current) {
+        return;
+      }
+      const state = String(data?.state || '').toLowerCase();
+      setStatusMessage(data.message || `WebRTC Session State: ${state}`);
+      if (state === 'error' || state === 'closed' || state === 'ended' || state === 'failed') {
+        setSessionState(state === 'error' ? 'error' : 'ended');
+        setControlState('disconnected');
+        setWebrtcStream(null);
+      }
     };
 
     socket.on('monitor_frame', handleFrame);
     socket.on('monitor_info', handleInfo);
     socket.on('monitor_state', handleState);
     socket.on('monitor_stop', handleStop);
+    socket.on('webrtc_answer', handleWebRtcAnswer);
+    socket.on('webrtc_ice_candidate', handleWebRtcIceCandidate);
+    socket.on('webrtc_session_state', handleWebRtcSessionState);
 
     return () => {
       socket.off('monitor_frame', handleFrame);
       socket.off('monitor_info', handleInfo);
       socket.off('monitor_state', handleState);
       socket.off('monitor_stop', handleStop);
+      socket.off('webrtc_answer', handleWebRtcAnswer);
+      socket.off('webrtc_ice_candidate', handleWebRtcIceCandidate);
+      socket.off('webrtc_session_state', handleWebRtcSessionState);
     };
   }, [socket]);
 
@@ -137,12 +188,19 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
   }, []);
 
   useEffect(() => {
+    if (videoRef.current && webrtcStream) {
+      videoRef.current.srcObject = webrtcStream;
+    }
+  }, [webrtcStream]);
+
+  useEffect(() => {
     stopSession(true, 'viewer_switch_device');
     if (!device) {
       setSessionState('idle');
       setControlState('disconnected');
       setScreenInfo(null);
       setFrameSrc(null);
+      setWebrtcStream(null);
       setStatusMessage('Select a device to start monitoring');
       return;
     }
@@ -150,6 +208,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
     setControlState('disconnected');
     setScreenInfo(null);
     setFrameSrc(null);
+    setWebrtcStream(null);
     setStatusMessage('Ready to start monitoring');
   }, [device?.device_id]);
 
@@ -161,15 +220,31 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
         device_id: device.device_id,
         reason,
       });
+      socket.emit('webrtc_hangup', {
+        session_id: activeSessionId,
+        device_id: device.device_id,
+        reason,
+      });
     }
 
+    if (dataChannelRef.current) {
+      dataChannelRef.current.close();
+      dataChannelRef.current = null;
+    }
+
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+
+    setWebrtcStream(null);
     sessionIdRef.current = null;
     setControlState('disconnected');
     setScreenInfo(null);
     setFrameSrc(null);
   };
 
-  const startSession = () => {
+  const startSession = async () => {
     if (!socket || !device?.device_id) {
       return;
     }
@@ -180,25 +255,80 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
     sessionIdRef.current = sessionId;
     setSessionState('connecting');
     setControlState('connecting');
-    setStatusMessage('Requesting device stream');
+    setStatusMessage('Initializing WebRTC connection...');
 
-    socket.emit(
-      'monitor_start',
-      {
-        session_id: sessionId,
-        device_id: device.device_id,
-      },
-      (response: any) => {
-        if (response?.status !== 'success') {
-          setSessionState('error');
-          setControlState('disconnected');
-          setStatusMessage(response?.message || 'Failed to start stream');
-          sessionIdRef.current = null;
-          return;
+    try {
+      const pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+        ],
+      });
+      peerConnectionRef.current = pc;
+
+      pc.addTransceiver('video', { direction: 'recvonly' });
+
+      const dc = pc.createDataChannel('control', { ordered: true });
+      dataChannelRef.current = dc;
+
+      dc.onopen = () => {
+        setControlState('connected');
+        console.log('[WebRTC] Control data channel opened');
+      };
+      dc.onclose = () => {
+        setControlState('disconnected');
+        console.log('[WebRTC] Control data channel closed');
+      };
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate && socket && sessionIdRef.current && device?.device_id) {
+          socket.emit('webrtc_ice_candidate', {
+            session_id: sessionIdRef.current,
+            device_id: device.device_id,
+            candidate: event.candidate,
+          });
         }
-        setStatusMessage('Waiting for device frames');
-      }
-    );
+      };
+
+      pc.ontrack = (event) => {
+        if (event.streams && event.streams[0]) {
+          setWebrtcStream(event.streams[0]);
+          setSessionState('connected');
+          setStatusMessage('Live WebRTC stream active');
+        }
+      };
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      socket.emit(
+        'webrtc_offer',
+        {
+          session_id: sessionId,
+          device_id: device.device_id,
+          description: {
+            type: offer.type,
+            sdp: offer.sdp,
+          },
+        },
+        (response: any) => {
+          if (response?.status !== 'success') {
+            setSessionState('error');
+            setControlState('disconnected');
+            setStatusMessage(response?.message || 'Failed to send WebRTC offer');
+            stopSession(false);
+          } else {
+            setStatusMessage('WebRTC offer sent, waiting for remote answer...');
+          }
+        }
+      );
+    } catch (e) {
+      setSessionState('error');
+      setControlState('disconnected');
+      setStatusMessage('WebRTC initialization failed: ' + (e instanceof Error ? e.message : String(e)));
+      stopSession(false);
+    }
   };
 
   const canStart = Boolean(
@@ -209,6 +339,15 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
   );
 
   const sendControlMessage = (payload: Record<string, unknown>) => {
+    if (dataChannelRef.current && dataChannelRef.current.readyState === 'open') {
+      try {
+        dataChannelRef.current.send(JSON.stringify(payload));
+        return true;
+      } catch (err) {
+        console.warn('Failed to send control message via WebRTC DataChannel, falling back to socket', err);
+      }
+    }
+
     if (!socket || !sessionIdRef.current || !device?.device_id) {
       return false;
     }
@@ -222,24 +361,24 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
   };
 
   const getNormalizedPoint = (clientX: number, clientY: number) => {
-    const image = imageRef.current;
-    if (!image) {
+    const element = videoRef.current || imageRef.current;
+    if (!element) {
       return null;
     }
 
-    const rect = image.getBoundingClientRect();
+    const rect = element.getBoundingClientRect();
     if (!rect.width || !rect.height) {
       return null;
     }
 
-    const imageWidth = image.naturalWidth || screenInfo?.width || 0;
-    const imageHeight = image.naturalHeight || screenInfo?.height || 0;
-    if (!imageWidth || !imageHeight) {
+    const nativeWidth = (element as HTMLVideoElement).videoWidth || (element as HTMLImageElement).naturalWidth || screenInfo?.width || 0;
+    const nativeHeight = (element as HTMLVideoElement).videoHeight || (element as HTMLImageElement).naturalHeight || screenInfo?.height || 0;
+    if (!nativeWidth || !nativeHeight) {
       return null;
     }
 
     const elementAspect = rect.width / rect.height;
-    const imageAspect = imageWidth / imageHeight;
+    const imageAspect = nativeWidth / nativeHeight;
 
     let renderWidth = rect.width;
     let renderHeight = rect.height;
@@ -441,7 +580,15 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
             isFullscreen ? 'flex h-screen w-screen items-center justify-center rounded-none border-0' : ''
           }`}
         >
-          {frameSrc ? (
+          {webrtcStream ? (
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="h-full w-full object-contain"
+            />
+          ) : frameSrc ? (
             <img
               ref={imageRef}
               src={frameSrc}
@@ -451,7 +598,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-sm text-white/60">
-              No frame received yet
+              No stream or frame received yet
             </div>
           )}
           <div
