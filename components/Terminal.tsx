@@ -13,6 +13,7 @@ interface TerminalProps {
 interface HistoryLine {
   type: 'input' | 'output' | 'error' | 'info';
   text: string;
+  dir?: string;
 }
 
 export function Terminal({ socket, device }: TerminalProps) {
@@ -24,6 +25,7 @@ export function Terminal({ socket, device }: TerminalProps) {
   const [loading, setLoading] = useState(false);
   const [cmdHistory, setCmdHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [currentDir, setCurrentDir] = useState('/');
   
   const consoleRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -43,6 +45,7 @@ export function Terminal({ socket, device }: TerminalProps) {
       setCmdHistory([]);
       setHistoryIndex(-1);
       setInput('');
+      setCurrentDir('/');
     }
   }, [device?.device_id, device?.device_name]);
 
@@ -50,7 +53,7 @@ export function Terminal({ socket, device }: TerminalProps) {
     const trimmed = cmdToSend.trim();
     if (!trimmed || !socket || !device?.device_id || loading) return;
 
-    setHistory((prev) => [...prev, { type: 'input', text: trimmed }]);
+    setHistory((prev) => [...prev, { type: 'input', text: trimmed, dir: currentDir }]);
     setLoading(true);
     setInput('');
     setHistoryIndex(-1);
@@ -61,6 +64,21 @@ export function Terminal({ socket, device }: TerminalProps) {
       return [...filtered, trimmed];
     });
 
+    const isCd = trimmed === 'cd' || trimmed.startsWith('cd ');
+    
+    // Construct command
+    let commandToExecute = '';
+    if (isCd) {
+      if (trimmed === 'cd') {
+        commandToExecute = 'cd / && pwd';
+      } else {
+        const targetDir = trimmed.substring(3).trim();
+        commandToExecute = `cd ${currentDir} && cd ${targetDir} && pwd`;
+      }
+    } else {
+      commandToExecute = `cd ${currentDir} && ${trimmed}`;
+    }
+
     const localCommandId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     socket.emit(
@@ -70,7 +88,7 @@ export function Terminal({ socket, device }: TerminalProps) {
         device_id: device.device_id,
         command: 'run_shell',
         command_id: localCommandId,
-        payload: { command: trimmed },
+        payload: { command: commandToExecute },
       },
       (response: any) => {
         setLoading(false);
@@ -79,12 +97,23 @@ export function Terminal({ socket, device }: TerminalProps) {
           const exitCode = devResp.exit_code ?? 0;
           const output = devResp.output || '';
           
-          if (output) {
-            setHistory((prev) => [...prev, { type: 'output', text: output }]);
-          }
-          
-          if (exitCode !== 0) {
-            setHistory((prev) => [...prev, { type: 'error', text: `Process exited with code ${exitCode}` }]);
+          if (isCd) {
+            if (exitCode === 0) {
+              const newDir = output.trim();
+              setCurrentDir(newDir || '/');
+            } else {
+              setHistory((prev) => [
+                ...prev,
+                { type: 'error', text: output ? output : `cd: failed to change directory` }
+              ]);
+            }
+          } else {
+            if (output) {
+              setHistory((prev) => [...prev, { type: 'output', text: output }]);
+            }
+            if (exitCode !== 0) {
+              setHistory((prev) => [...prev, { type: 'error', text: `Process exited with code ${exitCode}` }]);
+            }
           }
         } else {
           setHistory((prev) => [
@@ -166,7 +195,7 @@ export function Terminal({ socket, device }: TerminalProps) {
           if (line.type === 'input') {
             return (
               <div key={idx} className="flex items-start gap-1">
-                <span className="text-blue-400 select-none">root@android:#</span>
+                <span className="text-blue-400 select-none">root@android:{line.dir ?? '/'}#</span>
                 <span className="text-white font-semibold whitespace-pre-wrap">{line.text}</span>
               </div>
             );
@@ -197,10 +226,12 @@ export function Terminal({ socket, device }: TerminalProps) {
           </div>
         )}
       </div>
-
+ 
       {/* Input Prompt bar */}
       <div className="flex items-center gap-2 mt-3 bg-input rounded-lg border border-border px-3 py-2">
-        <span className="text-xs font-mono text-blue-400 font-bold select-none">#</span>
+        <span className="text-xs font-mono text-blue-400 font-bold select-none">
+          root@android:{currentDir}#
+        </span>
         <input
           type="text"
           ref={inputRef}
