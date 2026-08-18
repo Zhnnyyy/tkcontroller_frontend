@@ -44,10 +44,11 @@ export const COMMAND_PAYLOAD_FIELDS: Record<string, PayloadField[]> = {
   tailscale_up: [
     {
       key: 'auth_key',
-      label: 'Tailscale auth key',
+      label: 'Tailscale auth key (optional)',
       placeholder: 'tskey-...',
       type: 'text',
-      required: true,
+      required: false,
+      helper: 'Leave blank if already authenticated',
     },
   ],
   update_service: [
