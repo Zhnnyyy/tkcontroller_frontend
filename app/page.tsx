@@ -11,6 +11,7 @@ import { Settings, RotateCcw } from 'lucide-react';
 import { useAuth } from '@/components/AuthGate';
 import { RemoteMonitor } from '@/components/RemoteMonitor';
 import { FileManager } from '@/components/FileManager';
+import { Terminal } from '@/components/Terminal';
 
 export default function Home() {
   const { logout, session } = useAuth();
@@ -108,6 +109,7 @@ export default function Home() {
           <div className="lg:col-span-2 space-y-8">
             <RemoteMonitor socket={socket} device={selectedDevice} />
             <FileManager socket={socket} device={selectedDevice} />
+            <Terminal socket={socket} device={selectedDevice} />
 
             {/* Commands Section */}
             <section>
