@@ -255,16 +255,32 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
     sessionIdRef.current = sessionId;
     setSessionState('connecting');
     setControlState('connecting');
-    setStatusMessage('Initializing WebRTC connection...');
+    setStatusMessage('Fetching connection settings...');
 
     try {
-      const pc = new RTCPeerConnection({
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-        ],
-      });
+      let iceServers = [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+      ];
+
+      try {
+        const response = await new Promise<any>((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Timeout fetching ICE servers')), 3000);
+          socket.emit('get_ice_servers', (res: any) => {
+            clearTimeout(timeout);
+            resolve(res);
+          });
+        });
+        if (response && response.status === 'success' && Array.isArray(response.iceServers)) {
+          iceServers = response.iceServers;
+        }
+      } catch (err) {
+        console.warn('Failed to fetch ICE servers from backend, falling back to public STUN:', err);
+      }
+
+      setStatusMessage('Initializing WebRTC connection...');
+      const pc = new RTCPeerConnection({ iceServers });
       peerConnectionRef.current = pc;
 
       pc.addTransceiver('video', { direction: 'recvonly' });
