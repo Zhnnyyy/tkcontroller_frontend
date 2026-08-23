@@ -19,6 +19,40 @@ function createSessionId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+const getIceServersConfig = (): RTCIceServer[] => {
+  const envIceServers = process.env.NEXT_PUBLIC_ICE_SERVERS;
+  if (envIceServers) {
+    try {
+      return JSON.parse(envIceServers);
+    } catch (e) {
+      console.error('Failed to parse NEXT_PUBLIC_ICE_SERVERS environment variable:', e);
+    }
+  }
+
+  const turnUrl = process.env.NEXT_PUBLIC_TURN_URL;
+  const turnUsername = process.env.NEXT_PUBLIC_TURN_USERNAME;
+  const turnPassword = process.env.NEXT_PUBLIC_TURN_PASSWORD;
+
+  const stunServers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+  ];
+
+  if (turnUrl && turnUsername && turnPassword) {
+    return [
+      ...stunServers,
+      {
+        urls: turnUrl,
+        username: turnUsername,
+        credential: turnPassword,
+      },
+    ];
+  }
+
+  return stunServers;
+};
+
 interface RemoteMonitorProps {
   socket: Socket | null;
   device: Device | null;
@@ -258,12 +292,9 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
     setStatusMessage('Initializing WebRTC connection...');
 
     try {
+      const iceServersConfig = getIceServersConfig();
       const pc = new RTCPeerConnection({
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-        ],
+        iceServers: iceServersConfig,
       });
       peerConnectionRef.current = pc;
 
@@ -311,6 +342,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
             type: offer.type,
             sdp: offer.sdp,
           },
+          iceServers: iceServersConfig,
         },
         (response: any) => {
           if (response?.status !== 'success') {
