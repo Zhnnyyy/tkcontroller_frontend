@@ -23,7 +23,9 @@ const getIceServersConfig = (): RTCIceServer[] => {
   const envIceServers = process.env.NEXT_PUBLIC_ICE_SERVERS;
   if (envIceServers) {
     try {
-      return JSON.parse(envIceServers);
+      const parsed = JSON.parse(envIceServers);
+      console.log('[WebRTC] Using ICE servers from NEXT_PUBLIC_ICE_SERVERS:', parsed);
+      return parsed;
     } catch (e) {
       console.error('Failed to parse NEXT_PUBLIC_ICE_SERVERS environment variable:', e);
     }
@@ -40,7 +42,7 @@ const getIceServersConfig = (): RTCIceServer[] => {
   ];
 
   if (turnUrl && turnUsername && turnPassword) {
-    return [
+    const config = [
       ...stunServers,
       {
         urls: turnUrl,
@@ -48,8 +50,11 @@ const getIceServersConfig = (): RTCIceServer[] => {
         credential: turnPassword,
       },
     ];
+    console.log('[WebRTC] Using configured TURN server:', turnUrl, 'with STUN fallbacks.');
+    return config;
   }
 
+  console.warn('[WebRTC] No TURN server configured. Using fallback STUN servers only.');
   return stunServers;
 };
 
