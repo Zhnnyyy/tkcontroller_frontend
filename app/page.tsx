@@ -7,17 +7,20 @@ import { CommandGrid } from '@/components/CommandGrid';
 import { ResponseDisplay } from '@/components/ResponseDisplay';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
 import { CommandExecutionState } from '@/lib/types';
-import { Settings, RotateCcw } from 'lucide-react';
+import { Settings, RotateCcw, Tv, FolderOpen, Terminal as TerminalIcon, Cpu } from 'lucide-react';
 import { useAuth } from '@/components/AuthGate';
 import { RemoteMonitor } from '@/components/RemoteMonitor';
 import { FileManager } from '@/components/FileManager';
 import { Terminal } from '@/components/Terminal';
+
+type TabId = 'monitor' | 'files' | 'terminal' | 'commands';
 
 export default function Home() {
   const { logout, session } = useAuth();
   const { socket, isConnected, devices } = useSocket();
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [lastResponse, setLastResponse] = useState<CommandExecutionState | null>(null);
+  const [activeTab, setActiveTab] = useState<TabId>('monitor');
 
   // Auto-select first device when devices load
   useEffect(() => {
@@ -106,33 +109,94 @@ export default function Home() {
           </div>
 
           {/* Main Panel */}
-          <div className="lg:col-span-2 space-y-8">
-            <RemoteMonitor socket={socket} device={selectedDevice} />
-            <FileManager socket={socket} device={selectedDevice} />
-            <Terminal socket={socket} device={selectedDevice} />
+          <div className="lg:col-span-2 flex flex-col">
+            {/* Tabs Navigation */}
+            <div className="flex border-b border-border mb-6 overflow-x-auto whitespace-nowrap scrollbar-thin">
+              <button
+                onClick={() => setActiveTab('monitor')}
+                className={`py-3 px-6 font-medium text-sm transition-all border-b-2 -mb-[2px] flex items-center gap-2 ${
+                  activeTab === 'monitor'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-foreground/60 hover:text-foreground hover:border-border'
+                }`}
+              >
+                <Tv className="w-4 h-4" />
+                Remote Screen
+              </button>
+              <button
+                onClick={() => setActiveTab('files')}
+                className={`py-3 px-6 font-medium text-sm transition-all border-b-2 -mb-[2px] flex items-center gap-2 ${
+                  activeTab === 'files'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-foreground/60 hover:text-foreground hover:border-border'
+                }`}
+              >
+                <FolderOpen className="w-4 h-4" />
+                File Manager
+              </button>
+              <button
+                onClick={() => setActiveTab('terminal')}
+                className={`py-3 px-6 font-medium text-sm transition-all border-b-2 -mb-[2px] flex items-center gap-2 ${
+                  activeTab === 'terminal'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-foreground/60 hover:text-foreground hover:border-border'
+                }`}
+              >
+                <TerminalIcon className="w-4 h-4" />
+                Terminal
+              </button>
+              <button
+                onClick={() => setActiveTab('commands')}
+                className={`py-3 px-6 font-medium text-sm transition-all border-b-2 -mb-[2px] flex items-center gap-2 ${
+                  activeTab === 'commands'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-foreground/60 hover:text-foreground hover:border-border'
+                }`}
+              >
+                <Cpu className="w-4 h-4" />
+                Commands & Output
+              </button>
+            </div>
 
-            {/* Commands Section */}
-            <section>
-              <h2 className="text-xl font-bold text-foreground mb-4">
-                Available Commands
-              </h2>
-              <CommandGrid
-                deviceId={selectedDeviceId}
-                socket={socket}
-                onCommandExecute={handleCommandExecute}
-              />
-            </section>
+            {/* Tab Panes */}
+            <div className="space-y-6">
+              <div className={activeTab === 'monitor' ? '' : 'hidden'}>
+                <RemoteMonitor socket={socket} device={selectedDevice} />
+              </div>
+              
+              <div className={activeTab === 'files' ? '' : 'hidden'}>
+                <FileManager socket={socket} device={selectedDevice} />
+              </div>
+              
+              <div className={activeTab === 'terminal' ? '' : 'hidden'}>
+                <Terminal socket={socket} device={selectedDevice} />
+              </div>
+              
+              <div className={activeTab === 'commands' ? 'space-y-6' : 'hidden'}>
+                {/* Commands Section */}
+                <section className="bg-input border border-border rounded-lg p-6">
+                  <h2 className="text-xl font-bold text-foreground mb-4">
+                    Available Commands
+                  </h2>
+                  <CommandGrid
+                    deviceId={selectedDeviceId}
+                    socket={socket}
+                    onCommandExecute={handleCommandExecute}
+                  />
+                </section>
 
-            {/* Response Section */}
-            <section>
-              <h2 className="text-xl font-bold text-foreground mb-4">
-                Execution Result
-              </h2>
-              <ResponseDisplay
-                state={lastResponse}
-                onClear={() => setLastResponse(null)}
-              />
-            </section>
+                {/* Response Section */}
+                <section className="bg-input border border-border rounded-lg p-6">
+                  <h2 className="text-xl font-bold text-foreground mb-4">
+                    Execution Result
+                  </h2>
+                  <ResponseDisplay
+                    state={lastResponse}
+                    onClear={() => setLastResponse(null)}
+                  />
+                </section>
+              </div>
+            </div>
           </div>
         </div>
       </main>
