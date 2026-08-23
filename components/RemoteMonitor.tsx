@@ -289,7 +289,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
     sessionIdRef.current = sessionId;
     setSessionState('connecting');
     setControlState('connecting');
-    setStatusMessage('Initializing WebRTC connection...');
+    setStatusMessage('Fetching connection settings...');
 
     try {
       const iceServersConfig = getIceServersConfig();
