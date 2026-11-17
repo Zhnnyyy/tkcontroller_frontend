@@ -644,8 +644,8 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
               RustDesk Device ID
             </span>
             <div className="flex items-center justify-between gap-2">
-              <span className="font-mono text-xl sm:text-2xl font-bold text-primary tracking-wide truncate">
-                {rustdeskId || '1408621429'}
+              <span className={`font-mono text-xl sm:text-2xl font-bold tracking-wide truncate ${rustdeskId ? 'text-primary' : 'text-foreground/40 text-sm sm:text-base'}`}>
+                {rustdeskId || (isHostRunning ? 'Connecting Host...' : 'Host Stopped')}
               </span>
               <button
                 onClick={handleCopyId}
