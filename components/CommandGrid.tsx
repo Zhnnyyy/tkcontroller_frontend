@@ -18,6 +18,7 @@ const categoryIcons = {
   HEALTH: '❤️',
   SECURITY: '🛡️',
   DIAGNOSTICS: '🛠️',
+  ZHENTINEL: '🚀',
 };
 
 export const CommandGrid = ({

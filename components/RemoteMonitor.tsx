@@ -3,9 +3,26 @@
 import { PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 import { Socket } from 'socket.io-client';
 import { Device } from '@/lib/types';
+import {
+  Shield,
+  Server,
+  Key,
+  Lock,
+  ExternalLink,
+  Copy,
+  Check,
+  RotateCcw,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  Play,
+  Square,
+  Maximize2,
+  Minimize2,
+  Tv,
+} from 'lucide-react';
 
 type SessionState = 'idle' | 'connecting' | 'connected' | 'error' | 'ended';
-type ControlState = 'disconnected' | 'connecting' | 'connected';
 
 type ScreenInfo = {
   width: number;
@@ -19,45 +36,6 @@ function createSessionId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-const getIceServersConfig = (): RTCIceServer[] => {
-  const envIceServers = process.env.NEXT_PUBLIC_ICE_SERVERS;
-  if (envIceServers) {
-    try {
-      const parsed = JSON.parse(envIceServers);
-      console.log('[WebRTC] Using ICE servers from NEXT_PUBLIC_ICE_SERVERS:', parsed);
-      return parsed;
-    } catch (e) {
-      console.error('Failed to parse NEXT_PUBLIC_ICE_SERVERS environment variable:', e);
-    }
-  }
-
-  const turnUrl = process.env.NEXT_PUBLIC_TURN_URL;
-  const turnUsername = process.env.NEXT_PUBLIC_TURN_USERNAME;
-  const turnPassword = process.env.NEXT_PUBLIC_TURN_PASSWORD;
-
-  const stunServers = [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-  ];
-
-  if (turnUrl && turnUsername && turnPassword) {
-    const config = [
-      ...stunServers,
-      {
-        urls: turnUrl,
-        username: turnUsername,
-        credential: turnPassword,
-      },
-    ];
-    console.log('[WebRTC] Using configured TURN server:', turnUrl, 'with STUN fallbacks.');
-    return config;
-  }
-
-  console.warn('[WebRTC] No TURN server configured. Using fallback STUN servers only.');
-  return stunServers;
-};
-
 interface RemoteMonitorProps {
   socket: Socket | null;
   device: Device | null;
@@ -65,41 +43,49 @@ interface RemoteMonitorProps {
 
 export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
   const imageRef = useRef<HTMLImageElement | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
   const monitorContainerRef = useRef<HTMLDivElement | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const pointerStartRef = useRef<{ x: number; y: number; at: number } | null>(null);
-  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const dataChannelRef = useRef<RTCDataChannel | null>(null);
 
   const [sessionState, setSessionState] = useState<SessionState>('idle');
-  const [controlState, setControlState] = useState<ControlState>('disconnected');
-  const [statusMessage, setStatusMessage] = useState('No active stream');
+  const [statusMessage, setStatusMessage] = useState('Remote stream inactive');
   const [screenInfo, setScreenInfo] = useState<ScreenInfo | null>(null);
   const [frameSrc, setFrameSrc] = useState<string | null>(null);
-  const [webrtcStream, setWebrtcStream] = useState<MediaStream | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Provisioning form state
+  const [server, setServer] = useState('lbrdc-software.com:21116');
+  const [relay, setRelay] = useState('lbrdc-software.com:21117');
+  const [key, setKey] = useState('uHinkRyReE2WYB5SjKrDr3n6D2KOs1ZBvb+1pcAUYNI=');
+  const [password, setPassword] = useState('Lbrdc2021.');
+  const [showPassword, setShowPassword] = useState(false);
+  const [provStatus, setProvStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [provMessage, setProvMessage] = useState('');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const rustdeskId = device?.rustdesk_id || device?.zhentinel_id;
+  const isHostRunning = device?.zhentinel_status === 'running' || Boolean(rustdeskId);
 
   useEffect(() => {
-    if (!socket) {
-      return undefined;
+    if (device?.zhentinel_server) {
+      setServer(device.zhentinel_server);
     }
+  }, [device?.zhentinel_server]);
+
+  // Socket frame preview listener
+  useEffect(() => {
+    if (!socket) return;
 
     const handleFrame = (data: any) => {
-      if (data?.session_id !== sessionIdRef.current) {
-        return;
-      }
-
+      if (data?.session_id !== sessionIdRef.current) return;
       const frame = data?.frame;
-      if (!frame?.image) {
-        return;
-      }
+      if (!frame?.image) return;
 
       const mimeType = frame?.mime_type || 'image/png';
       setFrameSrc(`data:${mimeType};base64,${frame.image}`);
       setSessionState('connected');
-      setControlState('connected');
-      setStatusMessage('Live stream active');
+      setStatusMessage('Live preview active');
 
       const width = Number(frame?.width) || 0;
       const height = Number(frame?.height) || 0;
@@ -109,10 +95,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
     };
 
     const handleInfo = (data: any) => {
-      if (data?.session_id !== sessionIdRef.current) {
-        return;
-      }
-
+      if (data?.session_id !== sessionIdRef.current) return;
       const screen = data?.info?.screen;
       if (screen) {
         setScreenInfo({
@@ -123,539 +106,537 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
     };
 
     const handleState = (data: any) => {
-      if (data?.session_id !== sessionIdRef.current) {
-        return;
-      }
-
+      if (data?.session_id !== sessionIdRef.current) return;
       const state = String(data?.state || '').toLowerCase();
       const message = data?.message || 'Stream state updated';
       setStatusMessage(message);
 
       if (state === 'connected' || state === 'connecting') {
         setSessionState(state as SessionState);
-        return;
-      }
-
-      setSessionState(state === 'error' ? 'error' : 'ended');
-      setControlState('disconnected');
-      if (state !== 'connected') {
-        setFrameSrc(null);
-      }
-    };
-
-    const handleStop = (data: any) => {
-      if (data?.session_id !== sessionIdRef.current) {
-        return;
-      }
-
-      setSessionState('ended');
-      setControlState('disconnected');
-      setStatusMessage(data?.reason || 'Stream ended');
-      setFrameSrc(null);
-      setWebrtcStream(null);
-      sessionIdRef.current = null;
-    };
-
-    const handleWebRtcAnswer = async (data: any) => {
-      if (data?.session_id !== sessionIdRef.current || !peerConnectionRef.current) {
-        return;
-      }
-      try {
-        const desc = new RTCSessionDescription(data.description);
-        await peerConnectionRef.current.setRemoteDescription(desc);
-      } catch (err) {
-        console.error('Failed to set remote SDP answer', err);
-      }
-    };
-
-    const handleWebRtcIceCandidate = async (data: any) => {
-      if (
-        data?.session_id !== sessionIdRef.current ||
-        !peerConnectionRef.current ||
-        !data.candidate
-      ) {
-        return;
-      }
-      try {
-        await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
-      } catch (err) {
-        console.warn('Failed to add remote ICE candidate', err);
-      }
-    };
-
-    const handleWebRtcSessionState = (data: any) => {
-      if (data?.session_id !== sessionIdRef.current) {
-        return;
-      }
-      const state = String(data?.state || '').toLowerCase();
-      setStatusMessage(data.message || `WebRTC Session State: ${state}`);
-      if (state === 'error' || state === 'closed' || state === 'ended' || state === 'failed') {
+      } else {
         setSessionState(state === 'error' ? 'error' : 'ended');
-        setControlState('disconnected');
-        setWebrtcStream(null);
       }
     };
 
     socket.on('monitor_frame', handleFrame);
     socket.on('monitor_info', handleInfo);
     socket.on('monitor_state', handleState);
-    socket.on('monitor_stop', handleStop);
-    socket.on('webrtc_answer', handleWebRtcAnswer);
-    socket.on('webrtc_ice_candidate', handleWebRtcIceCandidate);
-    socket.on('webrtc_session_state', handleWebRtcSessionState);
 
     return () => {
       socket.off('monitor_frame', handleFrame);
       socket.off('monitor_info', handleInfo);
       socket.off('monitor_state', handleState);
-      socket.off('monitor_stop', handleStop);
-      socket.off('webrtc_answer', handleWebRtcAnswer);
-      socket.off('webrtc_ice_candidate', handleWebRtcIceCandidate);
-      socket.off('webrtc_session_state', handleWebRtcSessionState);
     };
   }, [socket]);
 
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(document.fullscreenElement === monitorContainerRef.current);
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (videoRef.current && webrtcStream) {
-      videoRef.current.srcObject = webrtcStream;
-    }
-  }, [webrtcStream]);
-
-  useEffect(() => {
-    stopSession(true, 'viewer_switch_device');
-    if (!device) {
-      setSessionState('idle');
-      setControlState('disconnected');
-      setScreenInfo(null);
-      setFrameSrc(null);
-      setWebrtcStream(null);
-      setStatusMessage('Select a device to start monitoring');
-      return;
-    }
-    setSessionState('idle');
-    setControlState('disconnected');
-    setScreenInfo(null);
-    setFrameSrc(null);
-    setWebrtcStream(null);
-    setStatusMessage('Ready to start monitoring');
-  }, [device?.device_id]);
-
-  const stopSession = (notifyServer: boolean, reason = 'viewer_stop') => {
-    const activeSessionId = sessionIdRef.current;
-    if (notifyServer && socket && activeSessionId && device?.device_id) {
-      socket.emit('monitor_stop', {
-        session_id: activeSessionId,
-        device_id: device.device_id,
-        reason,
-      });
-      socket.emit('webrtc_hangup', {
-        session_id: activeSessionId,
-        device_id: device.device_id,
-        reason,
-      });
-    }
-
-    if (dataChannelRef.current) {
-      dataChannelRef.current.close();
-      dataChannelRef.current = null;
-    }
-
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-      peerConnectionRef.current = null;
-    }
-
-    setWebrtcStream(null);
-    sessionIdRef.current = null;
-    setControlState('disconnected');
-    setScreenInfo(null);
-    setFrameSrc(null);
-  };
-
-  const startSession = async () => {
-    if (!socket || !device?.device_id) {
-      return;
-    }
-
-    stopSession(false);
-
+  const handleStartSocketPreview = () => {
+    if (!socket || !device) return;
     const sessionId = createSessionId();
     sessionIdRef.current = sessionId;
     setSessionState('connecting');
-    setControlState('connecting');
-    setStatusMessage('Fetching connection settings...');
+    setStatusMessage('Requesting socket preview...');
 
-    try {
-      const iceServersConfig = getIceServersConfig();
-      const pc = new RTCPeerConnection({
-        iceServers: iceServersConfig,
+    socket.emit(
+      'monitor_start',
+      {
+        session_id: sessionId,
+        device_id: device.device_id,
+        fps: 10,
+        scale: 0.5,
+        quality: 60,
+      },
+      (res: any) => {
+        if (res?.status === 'error') {
+          setSessionState('error');
+          setStatusMessage(res.message || 'Failed to start socket preview');
+        }
+      }
+    );
+  };
+
+  const handleStopSocketPreview = () => {
+    if (socket && sessionIdRef.current && device) {
+      socket.emit('monitor_stop', {
+        session_id: sessionIdRef.current,
+        device_id: device.device_id,
       });
-      peerConnectionRef.current = pc;
+    }
+    sessionIdRef.current = null;
+    setSessionState('idle');
+    setFrameSrc(null);
+    setStatusMessage('Remote stream inactive');
+  };
 
-      pc.addTransceiver('video', { direction: 'recvonly' });
-
-      const dc = pc.createDataChannel('control', { ordered: true });
-      dataChannelRef.current = dc;
-
-      dc.onopen = () => {
-        setControlState('connected');
-        console.log('[WebRTC] Control data channel opened');
-      };
-      dc.onclose = () => {
-        setControlState('disconnected');
-        console.log('[WebRTC] Control data channel closed');
-      };
-
-      pc.onicecandidate = (event) => {
-        if (event.candidate && socket && sessionIdRef.current && device?.device_id) {
-          socket.emit('webrtc_ice_candidate', {
-            session_id: sessionIdRef.current,
-            device_id: device.device_id,
-            candidate: event.candidate,
-          });
-        }
-      };
-
-      pc.ontrack = (event) => {
-        if (event.streams && event.streams[0]) {
-          setWebrtcStream(event.streams[0]);
-          setSessionState('connected');
-          setStatusMessage('Live WebRTC stream active');
-        }
-      };
-
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
-      socket.emit(
-        'webrtc_offer',
-        {
-          session_id: sessionId,
-          device_id: device.device_id,
-          description: {
-            type: offer.type,
-            sdp: offer.sdp,
-          },
-          iceServers: iceServersConfig,
-        },
-        (response: any) => {
-          if (response?.status !== 'success') {
-            setSessionState('error');
-            setControlState('disconnected');
-            setStatusMessage(response?.message || 'Failed to send WebRTC offer');
-            stopSession(false);
-          } else {
-            setStatusMessage('WebRTC offer sent, waiting for remote answer...');
-          }
-        }
-      );
-    } catch (e) {
-      setSessionState('error');
-      setControlState('disconnected');
-      setStatusMessage('WebRTC initialization failed: ' + (e instanceof Error ? e.message : String(e)));
-      stopSession(false);
+  const handleCopyId = () => {
+    if (rustdeskId) {
+      navigator.clipboard.writeText(rustdeskId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  const canStart = Boolean(
-    socket &&
-      device?.device_id &&
-      device.connection_status === 'connected' &&
-      sessionState !== 'connecting'
-  );
+  const handleConnectRustDesk = () => {
+    if (rustdeskId) {
+      window.location.href = `rustdesk://${rustdeskId}`;
+    }
+  };
 
-  const sendControlMessage = (payload: Record<string, unknown>) => {
-    if (dataChannelRef.current && dataChannelRef.current.readyState === 'open') {
-      try {
-        dataChannelRef.current.send(JSON.stringify(payload));
-        return true;
-      } catch (err) {
-        console.warn('Failed to send control message via WebRTC DataChannel, falling back to socket', err);
+  const handleRestartZhentinel = async () => {
+    if (!socket || !device) return;
+    setActionLoading('restart');
+    try {
+      await new Promise((resolve) => {
+        socket.emit(
+          'send_command',
+          {
+            deviceId: device.device_id,
+            device_id: device.device_id,
+            command: 'restart_zhentinel',
+          },
+          (res: any) => {
+            resolve(res);
+          }
+        );
+      });
+      setStatusMessage('Zhentinel Host restarted');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCheckStatus = async () => {
+    if (!socket || !device) return;
+    setActionLoading('check');
+    try {
+      await new Promise((resolve) => {
+        socket.emit(
+          'send_command',
+          {
+            deviceId: device.device_id,
+            device_id: device.device_id,
+            command: 'check_zhentinel_status',
+          },
+          (res: any) => {
+            resolve(res);
+          }
+        );
+      });
+      setStatusMessage('Status refreshed');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleProvisioningSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!socket || !device) return;
+
+    if (!server.trim()) {
+      setProvStatus('error');
+      setProvMessage('Server address is required');
+      return;
+    }
+    if (!key.trim()) {
+      setProvStatus('error');
+      setProvMessage('Public key is required');
+      return;
+    }
+    if (password.length < 8) {
+      setProvStatus('error');
+      setProvMessage('Password must be at least 8 characters');
+      return;
+    }
+
+    setProvStatus('loading');
+    setProvMessage('Writing provisioning.json and restarting Zhentinel host...');
+
+    const payload = {
+      server: server.trim(),
+      relay: relay.trim(),
+      key: key.trim(),
+      password,
+    };
+
+    try {
+      const response: any = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Provisioning command timed out after 25s'));
+        }, 25000);
+
+        socket.emit(
+          'send_command',
+          {
+            deviceId: device.device_id,
+            device_id: device.device_id,
+            command: 'update_remote_provisioning',
+            payload,
+          },
+          (res: any) => {
+            clearTimeout(timeout);
+            resolve(res);
+          }
+        );
+      });
+
+      const result = response?.response || response;
+      if (result?.status === 'success' || response?.status === 'success') {
+        setProvStatus('success');
+        setProvMessage(result?.message || 'Credentials successfully updated and host restarted!');
+        setTimeout(() => {
+          setProvStatus('idle');
+          setProvMessage('');
+        }, 4000);
+      } else {
+        setProvStatus('error');
+        setProvMessage(result?.message || response?.message || 'Failed to update remote credentials');
       }
+    } catch (err: any) {
+      setProvStatus('error');
+      setProvMessage(err.message || 'Error executing provisioning update');
     }
+  };
 
-    if (!socket || !sessionIdRef.current || !device?.device_id) {
-      return false;
-    }
-
+  // Touch control helper for socket preview
+  const sendControl = (action: string, payload: Record<string, any>) => {
+    if (!socket || !device || !sessionIdRef.current) return;
     socket.emit('monitor_control', {
       session_id: sessionIdRef.current,
       device_id: device.device_id,
-      payload,
+      action,
+      ...payload,
     });
-    return true;
   };
 
-  const getNormalizedPoint = (clientX: number, clientY: number) => {
-    const element = videoRef.current || imageRef.current;
-    if (!element) {
-      return null;
-    }
-
-    const rect = element.getBoundingClientRect();
-    if (!rect.width || !rect.height) {
-      return null;
-    }
-
-    const nativeWidth = (element as HTMLVideoElement).videoWidth || (element as HTMLImageElement).naturalWidth || screenInfo?.width || 0;
-    const nativeHeight = (element as HTMLVideoElement).videoHeight || (element as HTMLImageElement).naturalHeight || screenInfo?.height || 0;
-    if (!nativeWidth || !nativeHeight) {
-      return null;
-    }
-
-    const elementAspect = rect.width / rect.height;
-    const imageAspect = nativeWidth / nativeHeight;
-
-    let renderWidth = rect.width;
-    let renderHeight = rect.height;
-    let offsetX = 0;
-    let offsetY = 0;
-
-    if (imageAspect > elementAspect) {
-      renderHeight = rect.width / imageAspect;
-      offsetY = (rect.height - renderHeight) / 2;
-    } else {
-      renderWidth = rect.height * imageAspect;
-      offsetX = (rect.width - renderWidth) / 2;
-    }
-
-    const localX = clientX - rect.left - offsetX;
-    const localY = clientY - rect.top - offsetY;
-    if (localX < 0 || localY < 0 || localX > renderWidth || localY > renderHeight) {
-      return null;
-    }
-
+  const getRelativeCoords = (event: ReactPointerEvent<HTMLImageElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+    const y = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+    const scaleX = (screenInfo?.width || 1200) / rect.width;
+    const scaleY = (screenInfo?.height || 2000) / rect.height;
     return {
-      x: localX / renderWidth,
-      y: localY / renderHeight,
+      x: Math.round(x * scaleX),
+      y: Math.round(y * scaleY),
     };
   };
 
-  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const point = getNormalizedPoint(event.clientX, event.clientY);
-    if (!point) {
-      return;
-    }
-    pointerStartRef.current = {
-      x: point.x,
-      y: point.y,
-      at: Date.now(),
-    };
-    event.currentTarget.setPointerCapture(event.pointerId);
+  const handlePointerDown = (event: ReactPointerEvent<HTMLImageElement>) => {
+    const coords = getRelativeCoords(event);
+    if (!coords) return;
+    pointerStartRef.current = { ...coords, at: Date.now() };
+    sendControl('down', coords);
   };
 
-  const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const handlePointerUp = (event: ReactPointerEvent<HTMLImageElement>) => {
+    const coords = getRelativeCoords(event);
+    if (!coords) return;
     const start = pointerStartRef.current;
     pointerStartRef.current = null;
-    if (!start) {
-      return;
+
+    if (start) {
+      const distance = Math.hypot(coords.x - start.x, coords.y - start.y);
+      const duration = Date.now() - start.at;
+      if (distance < 15 && duration < 350) {
+        sendControl('click', coords);
+        return;
+      }
     }
-
-    const end = getNormalizedPoint(event.clientX, event.clientY);
-    if (!end) {
-      return;
-    }
-
-    const distance = Math.hypot(end.x - start.x, end.y - start.y);
-    const durationMs = Math.max(80, Date.now() - start.at);
-
-    if (distance < 0.015) {
-      sendControlMessage({
-        type: 'tap',
-        x: end.x,
-        y: end.y,
-      });
-      return;
-    }
-
-    sendControlMessage({
-      type: 'swipe',
-      startX: start.x,
-      startY: start.y,
-      endX: end.x,
-      endY: end.y,
-      durationMs,
-    });
+    sendControl('up', coords);
   };
 
-  const handlePointerCancel = () => {
-    pointerStartRef.current = null;
-  };
-
-  const sendKey = (key: 'BACK' | 'HOME' | 'APP_SWITCH' | 'POWER') => {
-    sendControlMessage({
-      type: 'key',
-      key,
-    });
-  };
-
-  const toggleFullscreen = async () => {
-    const monitorContainer = monitorContainerRef.current;
-    if (!monitorContainer) {
-      return;
-    }
-
-    if (document.fullscreenElement === monitorContainer) {
-      await document.exitFullscreen();
-      return;
-    }
-
-    await monitorContainer.requestFullscreen();
-  };
+  if (!device) {
+    return (
+      <div className="card p-8 text-center text-foreground/60">
+        Please select a device from the sidebar to view remote controls.
+      </div>
+    );
+  }
 
   return (
-    <div className="card">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Live Monitor</h2>
-          <p className="mt-1 text-sm text-foreground/60">
-            Socket-relayed screen stream and remote control for the selected device
-          </p>
+    <div className="space-y-6">
+      {/* Zhentinel Remote Hub Card */}
+      <div className="card border-primary/30 bg-input p-6 space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/30 text-primary">
+              <Shield className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <span>Zhentinel Remote Control</span>
+                <span
+                  className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
+                    isHostRunning
+                      ? 'bg-success/20 text-success border border-success/30'
+                      : 'bg-foreground/10 text-foreground/60'
+                  }`}
+                >
+                  {isHostRunning ? '● Host Active' : '● Host Stopped'}
+                </span>
+              </h2>
+              <p className="text-xs text-foreground/60 mt-0.5">
+                Headless zero-click RustDesk service running on target device {device.device_name}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCheckStatus}
+              disabled={Boolean(actionLoading)}
+              className="btn-ghost flex items-center gap-1.5 text-xs py-2 px-3"
+              title="Refresh Remote Host Status"
+            >
+              {actionLoading === 'check' ? (
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              ) : (
+                <RotateCcw className="w-4 h-4 text-foreground/70" />
+              )}
+              <span>Check Status</span>
+            </button>
+            <button
+              onClick={handleRestartZhentinel}
+              disabled={Boolean(actionLoading)}
+              className="btn-ghost flex items-center gap-1.5 text-xs py-2 px-3 text-warning hover:text-warning"
+              title="Restart Zhentinel Host Service"
+            >
+              {actionLoading === 'restart' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RotateCcw className="w-4 h-4" />
+              )}
+              <span>Restart Host</span>
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={startSession}
-            disabled={!canStart}
-          >
-            {sessionState === 'connecting' ? 'Connecting...' : 'Start Stream'}
-          </button>
-          <button
-            type="button"
-            className="btn-ghost"
-            onClick={() => {
-              void toggleFullscreen();
-            }}
-          >
-            {isFullscreen ? 'Exit Big Screen' : 'Big Screen'}
-          </button>
-          <button
-            type="button"
-            className="btn-ghost"
-            onClick={() => {
-              setSessionState('ended');
-              setStatusMessage('Stream stopped by viewer');
-              stopSession(true);
-            }}
-            disabled={!sessionIdRef.current}
-          >
-            Stop
-          </button>
+
+        {/* Remote ID & Quick Launch */}
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="p-4 rounded-xl bg-background border border-border space-y-2">
+            <span className="text-xs font-semibold text-foreground/70 uppercase tracking-wider">
+              RustDesk Device ID
+            </span>
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-2xl font-bold text-primary tracking-wide">
+                {rustdeskId || '1408621429'}
+              </span>
+              <button
+                onClick={handleCopyId}
+                className="p-2 rounded-lg border border-border hover:bg-white/10 text-foreground/70 hover:text-foreground transition-colors flex items-center gap-1.5 text-xs font-medium"
+              >
+                {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
+                <span>{copied ? 'Copied' : 'Copy ID'}</span>
+              </button>
+            </div>
+            <p className="text-[11px] text-foreground/50">
+              Direct remote identifier for desktop RustDesk client connections.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-xl bg-background border border-border flex flex-col justify-between space-y-2">
+            <div>
+              <span className="text-xs font-semibold text-foreground/70 uppercase tracking-wider">
+                1-Click Connection
+              </span>
+              <p className="text-xs text-foreground/60 mt-1">
+                Launches your local RustDesk application directly to this kiosk tablet.
+              </p>
+            </div>
+            <button
+              onClick={handleConnectRustDesk}
+              className="w-full py-2.5 px-4 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 flex items-center justify-center gap-2 transition-all shadow-md"
+            >
+              <ExternalLink className="w-4 h-4" />
+              <span>Connect via RustDesk</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl border border-border bg-background/80 p-3">
-        <div className="mb-3 flex items-center justify-between text-sm">
-          <span className="text-foreground/70">
-            {device ? `${device.device_name} (${device.device_id})` : 'No device selected'}
-          </span>
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              sessionState === 'connected'
-                ? 'bg-success/15 text-green-300'
-                : sessionState === 'error'
-                  ? 'bg-error/15 text-red-300'
-                  : sessionState === 'connecting'
-                    ? 'bg-warning/15 text-yellow-200'
-                    : 'bg-input text-foreground/70'
-            }`}
-          >
-            {sessionState}
-          </span>
+      {/* Provisioning Credentials Form */}
+      <div className="card bg-input p-6 space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-border">
+          <div className="flex items-center gap-2">
+            <Server className="w-5 h-5 text-primary" />
+            <h3 className="text-lg font-bold">Remote Provisioning Credentials</h3>
+          </div>
+          <span className="text-xs text-foreground/50 font-mono">provisioning.json</span>
         </div>
 
-        <div className="mb-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="btn-ghost"
-            disabled={controlState !== 'connected'}
-            onClick={() => sendKey('BACK')}
-          >
-            Back
-          </button>
-          <button
-            type="button"
-            className="btn-ghost"
-            disabled={controlState !== 'connected'}
-            onClick={() => sendKey('HOME')}
-          >
-            Home
-          </button>
-          <button
-            type="button"
-            className="btn-ghost"
-            disabled={controlState !== 'connected'}
-            onClick={() => sendKey('APP_SWITCH')}
-          >
-            Recents
-          </button>
-          <button
-            type="button"
-            className="btn-ghost"
-            disabled={controlState !== 'connected'}
-            onClick={() => sendKey('POWER')}
-          >
-            Power
-          </button>
+        <p className="text-xs text-foreground/70">
+          Update the private rendezvous server, relay, public key, and permanent password. Pushing
+          credentials will deploy `provisioning.json` with root permissions and restart the host
+          service automatically.
+        </p>
+
+        <form onSubmit={handleProvisioningSubmit} className="space-y-4 pt-2">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold mb-1 flex items-center gap-1.5 text-foreground/90">
+                <Server className="w-3.5 h-3.5 text-primary" /> Rendezvous Server
+              </label>
+              <input
+                type="text"
+                value={server}
+                onChange={(e) => setServer(e.target.value)}
+                placeholder="e.g. lbrdc-software.com:21116"
+                className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold mb-1 flex items-center gap-1.5 text-foreground/90">
+                <Server className="w-3.5 h-3.5 text-primary/70" /> Relay Server
+              </label>
+              <input
+                type="text"
+                value={relay}
+                onChange={(e) => setRelay(e.target.value)}
+                placeholder="e.g. lbrdc-software.com:21117"
+                className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold mb-1 flex items-center gap-1.5 text-foreground/90">
+              <Key className="w-3.5 h-3.5 text-primary" /> Server Public Key
+            </label>
+            <input
+              type="text"
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              placeholder="Server public key base64"
+              className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary font-mono text-xs"
+              required
+            />
+          </div>
+
+          <div>
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-xs font-semibold flex items-center gap-1.5 text-foreground/90">
+                <Lock className="w-3.5 h-3.5 text-primary" /> Permanent Password
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="text-[11px] text-primary hover:underline"
+              >
+                {showPassword ? 'Hide Password' : 'Show Password'}
+              </button>
+            </div>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Minimum 8 characters"
+              className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+              required
+            />
+          </div>
+
+          {provMessage && (
+            <div
+              className={`p-3 rounded-lg text-xs flex items-center gap-2 ${
+                provStatus === 'success'
+                  ? 'bg-success/15 border border-success/30 text-success'
+                  : provStatus === 'error'
+                  ? 'bg-error/15 border border-error/30 text-error'
+                  : 'bg-primary/10 border border-primary/20 text-foreground'
+              }`}
+            >
+              {provStatus === 'loading' && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+              {provStatus === 'success' && <CheckCircle2 className="w-4 h-4 text-success" />}
+              {provStatus === 'error' && <AlertCircle className="w-4 h-4 text-error" />}
+              <span>{provMessage}</span>
+            </div>
+          )}
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={provStatus === 'loading'}
+              className="py-2.5 px-6 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 flex items-center gap-2 transition-all shadow-md"
+            >
+              {provStatus === 'loading' && <Loader2 className="w-4 h-4 animate-spin" />}
+              <span>Push Provisioning & Restart Host</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Browser Snapshot Preview (Pure Socket JPEG Mirror, No WebRTC) */}
+      <div className="card bg-input p-6 space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-border">
+          <div className="flex items-center gap-2">
+            <Tv className="w-5 h-5 text-primary" />
+            <h3 className="text-lg font-bold">In-Browser Screen Preview</h3>
+            <span className="text-[11px] px-2 py-0.5 rounded bg-background border border-border text-foreground/60">
+              Socket Fallback
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {sessionState === 'connected' ? (
+              <button
+                onClick={handleStopSocketPreview}
+                className="py-1.5 px-3 rounded-lg bg-error text-primary-foreground text-xs font-medium hover:opacity-90 flex items-center gap-1.5 transition-all"
+              >
+                <Square className="w-3.5 h-3.5" />
+                <span>Stop Preview</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleStartSocketPreview}
+                disabled={sessionState === 'connecting'}
+                className="py-1.5 px-3 rounded-lg border border-border hover:bg-white/10 text-xs font-medium flex items-center gap-1.5 transition-all"
+              >
+                {sessionState === 'connecting' ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                ) : (
+                  <Play className="w-3.5 h-3.5 text-success" />
+                )}
+                <span>Start Browser Preview</span>
+              </button>
+            )}
+            {frameSrc && (
+              <button
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                className="p-1.5 rounded-lg border border-border hover:bg-white/10 text-foreground/70"
+                title="Toggle Fullscreen"
+              >
+                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              </button>
+            )}
+          </div>
         </div>
 
         <div
           ref={monitorContainerRef}
-          className={`relative aspect-video overflow-hidden rounded-lg border border-border bg-black ${
-            isFullscreen ? 'flex h-screen w-screen items-center justify-center rounded-none border-0' : ''
+          className={`relative rounded-xl border border-border bg-black/80 overflow-hidden flex items-center justify-center min-h-[320px] ${
+            isFullscreen ? 'fixed inset-4 z-50 min-h-0' : ''
           }`}
         >
-          {webrtcStream ? (
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="h-full w-full object-contain"
-            />
-          ) : frameSrc ? (
+          {frameSrc ? (
             <img
               ref={imageRef}
               src={frameSrc}
               alt="Remote device screen"
-              className="h-full w-full object-contain"
+              className="max-h-[600px] w-auto object-contain cursor-crosshair select-none"
+              onPointerDown={handlePointerDown}
+              onPointerUp={handlePointerUp}
               draggable={false}
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-sm text-white/60">
-              No stream or frame received yet
+            <div className="text-center p-8 space-y-2 text-foreground/50">
+              <Tv className="w-12 h-12 mx-auto text-foreground/20" />
+              <p className="text-sm font-medium">{statusMessage}</p>
+              <p className="text-xs">
+                For full 60fps low-latency remote control, launch the RustDesk desktop client above.
+              </p>
             </div>
           )}
-          <div
-            className={`absolute inset-0 ${
-              controlState === 'connected' ? 'cursor-crosshair' : 'cursor-not-allowed'
-            }`}
-            onPointerDown={controlState === 'connected' ? handlePointerDown : undefined}
-            onPointerUp={controlState === 'connected' ? handlePointerUp : undefined}
-            onPointerCancel={handlePointerCancel}
-          />
         </div>
-
-        <p className="mt-3 text-sm text-foreground/60">{statusMessage}</p>
-        <p className="mt-1 text-xs text-foreground/50">
-          Control: {controlState}
-          {screenInfo ? ` | ${screenInfo.width}x${screenInfo.height}` : ''}
-        </p>
-        <p className="mt-1 text-xs text-foreground/50">
-          Tap to click. Drag on the stream to send a swipe.
-        </p>
       </div>
     </div>
   );

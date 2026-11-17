@@ -4,6 +4,10 @@ export interface Device {
   connection_status: 'connected' | 'disconnected' | 'connecting';
   health_metrics?: Record<string, any>;
   last_seen?: string;
+  rustdesk_id?: string;
+  zhentinel_id?: string;
+  zhentinel_status?: string;
+  zhentinel_server?: string;
 }
 
 export interface CommandResponse {
@@ -65,6 +69,10 @@ export const DEVICE_COMMANDS = {
   ],
   HEALTH: [
     { id: 'check_device_health', label: 'Check Device Health' },
+  ],
+  ZHENTINEL: [
+    { id: 'check_zhentinel_status', label: 'Check Remote Status' },
+    { id: 'restart_zhentinel', label: 'Restart Zhentinel Host' },
   ],
   DIAGNOSTICS: [
     { id: 'capture_screenshot', label: 'Capture Screenshot' },

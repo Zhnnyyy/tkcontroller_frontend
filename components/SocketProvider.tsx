@@ -31,6 +31,10 @@ const normalizeDevice = (data: any, existing?: Device): Device => {
     connection_status: connectionStatus,
     health_metrics: data?.health_metrics ?? data?.healthMetrics ?? existing?.health_metrics,
     last_seen: data?.last_seen ?? data?.lastSeen ?? existing?.last_seen,
+    rustdesk_id: data?.rustdesk_id ?? data?.zhentinel_id ?? existing?.rustdesk_id ?? existing?.zhentinel_id,
+    zhentinel_id: data?.zhentinel_id ?? data?.rustdesk_id ?? existing?.zhentinel_id ?? existing?.rustdesk_id,
+    zhentinel_status: data?.zhentinel_status ?? existing?.zhentinel_status,
+    zhentinel_server: data?.zhentinel_server ?? existing?.zhentinel_server,
   };
 };
 

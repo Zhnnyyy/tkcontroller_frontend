@@ -12,6 +12,7 @@ import { useAuth } from '@/components/AuthGate';
 import { RemoteMonitor } from '@/components/RemoteMonitor';
 import { FileManager } from '@/components/FileManager';
 import { Terminal } from '@/components/Terminal';
+import { ProvisioningModal } from '@/components/ProvisioningModal';
 
 type TabId = 'monitor' | 'files' | 'terminal' | 'commands';
 
@@ -21,6 +22,7 @@ export default function Home() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [lastResponse, setLastResponse] = useState<CommandExecutionState | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('monitor');
+  const [isProvisioningOpen, setIsProvisioningOpen] = useState(false);
 
   // Auto-select first device when devices load
   useEffect(() => {
@@ -104,6 +106,7 @@ export default function Home() {
                 devices={devices}
                 selectedDeviceId={selectedDeviceId}
                 onSelectDevice={setSelectedDeviceId}
+                onOpenProvisioning={() => setIsProvisioningOpen(true)}
               />
             </div>
           </div>
@@ -121,7 +124,7 @@ export default function Home() {
                 }`}
               >
                 <Tv className="w-4 h-4" />
-                Remote Screen
+                Remote & Screen
               </button>
               <button
                 onClick={() => setActiveTab('files')}
@@ -207,6 +210,24 @@ export default function Home() {
           <p>Device Controller v1.0 • Connected to backend</p>
         </div>
       </footer>
+
+      {/* Provisioning Modal */}
+      {selectedDevice && (
+        <ProvisioningModal
+          device={selectedDevice}
+          socket={socket}
+          isOpen={isProvisioningOpen}
+          onClose={() => setIsProvisioningOpen(false)}
+          onSuccess={(msg) => {
+            setLastResponse({
+              command: 'update_remote_provisioning',
+              status: 'success',
+              response: { success: true, message: msg },
+              timestamp: new Date().toISOString(),
+            });
+          }}
+        />
+      )}
     </div>
   );
 }
