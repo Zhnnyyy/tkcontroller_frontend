@@ -68,10 +68,25 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
   const isHostRunning = device?.zhentinel_status === 'running' || Boolean(rustdeskId);
 
   useEffect(() => {
-    if (device?.zhentinel_server) {
-      setServer(device.zhentinel_server);
+    if (device) {
+      if (device.zhentinel_server) setServer(device.zhentinel_server);
+      if (device.zhentinel_relay) setRelay(device.zhentinel_relay);
+      if (device.zhentinel_key) setKey(device.zhentinel_key);
+      if (device.zhentinel_password) setPassword(device.zhentinel_password);
     }
-  }, [device?.zhentinel_server]);
+    if (typeof window !== 'undefined' && device?.device_id) {
+      try {
+        const cached = localStorage.getItem(`zhentinel_prov_${device.device_id}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.server && !device?.zhentinel_server) setServer(parsed.server);
+          if (parsed.relay && !device?.zhentinel_relay) setRelay(parsed.relay);
+          if (parsed.key && !device?.zhentinel_key) setKey(parsed.key);
+          if (parsed.password && !device?.zhentinel_password) setPassword(parsed.password);
+        }
+      } catch (ignored) {}
+    }
+  }, [device]);
 
   // Socket frame preview listener
   useEffect(() => {
@@ -280,6 +295,11 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
 
       const result = response?.response || response;
       if (result?.status === 'success' || response?.status === 'success') {
+        if (typeof window !== 'undefined' && device?.device_id) {
+          try {
+            localStorage.setItem(`zhentinel_prov_${device.device_id}`, JSON.stringify(payload));
+          } catch (ignored) {}
+        }
         setProvStatus('success');
         setProvMessage(result?.message || 'Credentials successfully updated and host restarted!');
         setTimeout(() => {

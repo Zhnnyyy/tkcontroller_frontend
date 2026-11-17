@@ -20,13 +20,36 @@ export const ProvisioningModal = ({
   onClose,
   onSuccess,
 }: ProvisioningModalProps) => {
-  const [server, setServer] = useState(device.zhentinel_server || 'lbrdc-software.com:21116');
-  const [relay, setRelay] = useState('lbrdc-software.com:21117');
-  const [key, setKey] = useState('uHinkRyReE2WYB5SjKrDr3n6D2KOs1ZBvb+1pcAUYNI=');
-  const [password, setPassword] = useState('Lbrdc2021.');
+  const [server, setServer] = useState(device?.zhentinel_server || 'lbrdc-software.com:21116');
+  const [relay, setRelay] = useState(device?.zhentinel_relay || 'lbrdc-software.com:21117');
+  const [key, setKey] = useState(device?.zhentinel_key || 'uHinkRyReE2WYB5SjKrDr3n6D2KOs1ZBvb+1pcAUYNI=');
+  const [password, setPassword] = useState(device?.zhentinel_password || 'Lbrdc2021.');
   const [showPassword, setShowPassword] = useState(false);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
+
+  // Synchronize from device data or localStorage cache
+  useState(() => {
+    if (typeof window !== 'undefined' && device?.device_id) {
+      try {
+        const cached = localStorage.getItem(`zhentinel_prov_${device.device_id}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.server && !device.zhentinel_server) setServer(parsed.server);
+          if (parsed.relay && !device.zhentinel_relay) setRelay(parsed.relay);
+          if (parsed.key && !device.zhentinel_key) setKey(parsed.key);
+          if (parsed.password && !device.zhentinel_password) setPassword(parsed.password);
+        }
+      } catch (ignored) {}
+    }
+  });
+
+  if (device) {
+    if (device.zhentinel_server && server !== device.zhentinel_server) setServer(device.zhentinel_server);
+    if (device.zhentinel_relay && relay !== device.zhentinel_relay) setRelay(device.zhentinel_relay);
+    if (device.zhentinel_key && key !== device.zhentinel_key) setKey(device.zhentinel_key);
+    if (device.zhentinel_password && password !== device.zhentinel_password) setPassword(device.zhentinel_password);
+  }
 
   if (!isOpen) return null;
 
@@ -83,6 +106,11 @@ export const ProvisioningModal = ({
 
       const result = response?.response || response;
       if (result?.status === 'success' || response?.status === 'success') {
+        if (typeof window !== 'undefined' && device?.device_id) {
+          try {
+            localStorage.setItem(`zhentinel_prov_${device.device_id}`, JSON.stringify(payload));
+          } catch (ignored) {}
+        }
         setStatus('success');
         const successMsg = result?.message || 'Zhentinel credentials updated and host restarted successfully!';
         setMessage(successMsg);

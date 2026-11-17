@@ -35,6 +35,9 @@ const normalizeDevice = (data: any, existing?: Device): Device => {
     zhentinel_id: data?.zhentinel_id ?? data?.rustdesk_id ?? existing?.zhentinel_id ?? existing?.rustdesk_id,
     zhentinel_status: data?.zhentinel_status ?? existing?.zhentinel_status,
     zhentinel_server: data?.zhentinel_server ?? existing?.zhentinel_server,
+    zhentinel_relay: data?.zhentinel_relay ?? existing?.zhentinel_relay,
+    zhentinel_key: data?.zhentinel_key ?? existing?.zhentinel_key,
+    zhentinel_password: data?.zhentinel_password ?? existing?.zhentinel_password,
   };
 };
 

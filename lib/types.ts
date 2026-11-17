@@ -8,6 +8,9 @@ export interface Device {
   zhentinel_id?: string;
   zhentinel_status?: string;
   zhentinel_server?: string;
+  zhentinel_relay?: string;
+  zhentinel_key?: string;
+  zhentinel_password?: string;
 }
 
 export interface CommandResponse {
