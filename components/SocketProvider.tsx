@@ -38,6 +38,11 @@ const normalizeDevice = (data: any, existing?: Device): Device => {
     zhentinel_relay: data?.zhentinel_relay ?? existing?.zhentinel_relay,
     zhentinel_key: data?.zhentinel_key ?? existing?.zhentinel_key,
     zhentinel_password: data?.zhentinel_password ?? existing?.zhentinel_password,
+    session_in_use: data?.session_in_use !== undefined ? Boolean(data?.session_in_use) : existing?.session_in_use,
+    session_operator: data?.session_operator ?? existing?.session_operator,
+    session_type: data?.session_type ?? existing?.session_type,
+    session_started_at: data?.session_started_at ?? existing?.session_started_at,
+    is_auto_provisioned: data?.is_auto_provisioned ?? existing?.is_auto_provisioned,
   };
 };
 
@@ -94,6 +99,25 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
         prev.map((d) =>
           d.device_id === data.device_id
             ? { ...d, connection_status: 'disconnected', last_seen: new Date().toISOString() }
+            : d
+        )
+      );
+    });
+
+    newSocket.on('session_status', (data: any) => {
+      console.log('[v0] Session status broadcast:', data);
+      const targetId = data?.device_id || data?.deviceId;
+      if (!targetId) return;
+      setDevices((prev) =>
+        prev.map((d) =>
+          d.device_id === targetId
+            ? {
+                ...d,
+                session_in_use: Boolean(data.in_use),
+                session_operator: data.in_use ? (data.operator || 'Operator') : null,
+                session_type: data.in_use ? (data.type || 'remote') : null,
+                session_started_at: data.in_use ? (data.started_at || Date.now()) : null,
+              }
             : d
         )
       );

@@ -11,6 +11,19 @@ export interface Device {
   zhentinel_relay?: string;
   zhentinel_key?: string;
   zhentinel_password?: string;
+  session_in_use?: boolean;
+  session_operator?: string | null;
+  session_type?: 'rustdesk' | 'browser' | string | null;
+  session_started_at?: number | null;
+  is_auto_provisioned?: boolean;
+}
+
+export interface FleetProfile {
+  ENABLED: boolean;
+  SERVER: string;
+  RELAY: string;
+  KEY: string;
+  PASSWORD: string;
 }
 
 export interface CommandResponse {

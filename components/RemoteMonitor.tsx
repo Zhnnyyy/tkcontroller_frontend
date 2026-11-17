@@ -3,6 +3,8 @@
 import { PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 import { Socket } from 'socket.io-client';
 import { Device } from '@/lib/types';
+import { useAuth } from '@/components/AuthGate';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import {
   Shield,
   Server,
@@ -20,9 +22,45 @@ import {
   Maximize2,
   Minimize2,
   Tv,
+  Wifi,
+  Gauge,
+  Users,
+  Sparkles,
 } from 'lucide-react';
 
 type SessionState = 'idle' | 'connecting' | 'connected' | 'error' | 'ended';
+type BandwidthPreset = 'lan' | 'cellular';
+
+interface PresetConfig {
+  name: string;
+  resolution: string;
+  fps: number;
+  scale: number;
+  quality: number;
+  label: string;
+  badge: string;
+}
+
+const PRESET_CONFIGS: Record<BandwidthPreset, PresetConfig> = {
+  lan: {
+    name: 'LAN Mode',
+    resolution: '1080p',
+    fps: 30,
+    scale: 1.0,
+    quality: 85,
+    label: 'LAN Mode (1080p / 30fps)',
+    badge: '30 FPS • High Def',
+  },
+  cellular: {
+    name: 'Cellular / Low Bandwidth',
+    resolution: '720p',
+    fps: 15,
+    scale: 0.5,
+    quality: 50,
+    label: 'Cellular (720p / 15fps)',
+    badge: '15 FPS • Low Data',
+  },
+};
 
 type ScreenInfo = {
   width: number;
@@ -42,6 +80,7 @@ interface RemoteMonitorProps {
 }
 
 export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
+  const { session } = useAuth();
   const imageRef = useRef<HTMLImageElement | null>(null);
   const monitorContainerRef = useRef<HTMLDivElement | null>(null);
   const sessionIdRef = useRef<string | null>(null);
@@ -53,6 +92,11 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
   const [frameSrc, setFrameSrc] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [passwordCopied, setPasswordCopied] = useState(false);
+  const [warnSessionOpen, setWarnSessionOpen] = useState(false);
+
+  // Bandwidth & Framerate Preset state
+  const [bandwidthPreset, setBandwidthPreset] = useState<BandwidthPreset>('cellular');
 
   // Provisioning form state
   const [server, setServer] = useState('lbrdc-software.com:21116');
@@ -63,9 +107,22 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
   const [provStatus, setProvStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [provMessage, setProvMessage] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [fleetStatus, setFleetStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [fleetMessage, setFleetMessage] = useState('');
 
   const rustdeskId = device?.rustdesk_id || device?.zhentinel_id;
   const isHostRunning = device?.zhentinel_status === 'running' || Boolean(rustdeskId);
+  const sessionInUse = Boolean(device?.session_in_use);
+  const sessionOperator = device?.session_operator || 'Another Operator';
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedPreset = localStorage.getItem('zhentinel_monitor_preset') as BandwidthPreset | null;
+      if (savedPreset && (savedPreset === 'lan' || savedPreset === 'cellular')) {
+        setBandwidthPreset(savedPreset);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (device) {
@@ -144,21 +201,24 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
     };
   }, [socket]);
 
-  const handleStartSocketPreview = () => {
+  const handleStartSocketPreview = (presetOverride?: BandwidthPreset) => {
     if (!socket || !device) return;
+    const activePreset = presetOverride || bandwidthPreset;
+    const config = PRESET_CONFIGS[activePreset];
     const sessionId = createSessionId();
     sessionIdRef.current = sessionId;
     setSessionState('connecting');
-    setStatusMessage('Requesting socket preview...');
+    setStatusMessage(`Requesting socket preview (${config.resolution} @ ${config.fps}fps)...`);
 
     socket.emit(
       'monitor_start',
       {
         session_id: sessionId,
         device_id: device.device_id,
-        fps: 10,
-        scale: 0.5,
-        quality: 60,
+        operator: session?.username || 'Operator',
+        fps: config.fps,
+        scale: config.scale,
+        quality: config.quality,
       },
       (res: any) => {
         if (res?.status === 'error') {
@@ -169,7 +229,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
     );
   };
 
-  const handleStopSocketPreview = () => {
+  const handleStopSocketPreview = (resetSession = true) => {
     if (socket && sessionIdRef.current && device) {
       socket.emit('monitor_stop', {
         session_id: sessionIdRef.current,
@@ -177,9 +237,25 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
       });
     }
     sessionIdRef.current = null;
-    setSessionState('idle');
-    setFrameSrc(null);
-    setStatusMessage('Remote stream inactive');
+    if (resetSession) {
+      setSessionState('idle');
+      setFrameSrc(null);
+      setStatusMessage('Remote stream inactive');
+    }
+  };
+
+  const handlePresetToggle = (preset: BandwidthPreset) => {
+    if (preset === bandwidthPreset) return;
+    setBandwidthPreset(preset);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('zhentinel_monitor_preset', preset);
+    }
+    if (sessionState === 'connected' || sessionState === 'connecting') {
+      handleStopSocketPreview(false);
+      setTimeout(() => {
+        handleStartSocketPreview(preset);
+      }, 150);
+    }
   };
 
   const handleCopyId = () => {
@@ -190,9 +266,43 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
     }
   };
 
+  const executeConnectRustDesk = async () => {
+    if (!rustdeskId) return;
+    const targetPassword = device?.zhentinel_password || password || 'Lbrdc2021.';
+    try {
+      await navigator.clipboard.writeText(targetPassword);
+      setPasswordCopied(true);
+      setTimeout(() => setPasswordCopied(false), 4000);
+    } catch (err) {
+      console.warn('Clipboard write failed:', err);
+    }
+
+    if (socket && device) {
+      socket.emit('operator_session_start', {
+        device_id: device.device_id,
+        operator: session?.username || 'Operator',
+        type: 'rustdesk',
+      });
+    }
+
+    window.location.href = `rustdesk://${rustdeskId}`;
+  };
+
   const handleConnectRustDesk = () => {
-    if (rustdeskId) {
-      window.location.href = `rustdesk://${rustdeskId}`;
+    if (sessionInUse) {
+      setWarnSessionOpen(true);
+    } else {
+      executeConnectRustDesk();
+    }
+  };
+
+  const handleReleaseSession = () => {
+    if (!socket || !device) return;
+    socket.emit('operator_session_end', {
+      device_id: device.device_id,
+    });
+    if (sessionIdRef.current) {
+      handleStopSocketPreview(true);
     }
   };
 
@@ -316,6 +426,60 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
     }
   };
 
+  const handleSaveFleetProfile = () => {
+    if (!socket) return;
+    if (!server.trim() || !key.trim() || password.length < 8) {
+      setFleetStatus('error');
+      setFleetMessage('Please ensure valid Server, Key, and Password (>=8 chars) before saving fleet profile.');
+      return;
+    }
+
+    setFleetStatus('loading');
+    setFleetMessage('Saving default fleet profile in backend...');
+    socket.emit(
+      'update_fleet_profile',
+      {
+        server: server.trim(),
+        relay: relay.trim(),
+        key: key.trim(),
+        password,
+        enabled: true,
+      },
+      (res: any) => {
+        if (res?.status === 'success') {
+          setFleetStatus('success');
+          setFleetMessage('Fleet default profile saved! Newly connecting tablets will auto-configure without manual input.');
+          setTimeout(() => {
+            setFleetStatus('idle');
+            setFleetMessage('');
+          }, 5000);
+        } else {
+          setFleetStatus('error');
+          setFleetMessage(res?.message || 'Failed to save fleet profile');
+        }
+      }
+    );
+  };
+
+  const handleLoadFleetProfile = () => {
+    if (!socket) return;
+    socket.emit('get_fleet_profile', (res: any) => {
+      const prof = res?.profile;
+      if (prof) {
+        if (prof.SERVER) setServer(prof.SERVER);
+        if (prof.RELAY) setRelay(prof.RELAY);
+        if (prof.KEY) setKey(prof.KEY);
+        if (prof.PASSWORD) setPassword(prof.PASSWORD);
+        setFleetStatus('success');
+        setFleetMessage('Loaded fleet profile default parameters.');
+        setTimeout(() => {
+          setFleetStatus('idle');
+          setFleetMessage('');
+        }, 3000);
+      }
+    });
+  };
+
   // Touch control helper for socket preview
   const sendControl = (action: string, payload: Record<string, any>) => {
     if (!socket || !device || !sessionIdRef.current) return;
@@ -374,6 +538,49 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Session In-Use Active Warning Banner */}
+      {sessionInUse && (
+        <div className="p-3.5 sm:p-4 rounded-xl bg-error/15 border border-error/40 text-error flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-pulse">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 rounded-lg bg-error/20 border border-error/30 shrink-0">
+              <Users className="w-5 h-5 text-error" />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-xs sm:text-sm font-bold flex items-center gap-2">
+                <span>Remote Session Currently Active</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-error/25 uppercase font-semibold">
+                  In-Use
+                </span>
+              </h4>
+              <p className="text-[11px] sm:text-xs opacity-90 truncate mt-0.5">
+                Active Operator: <strong className="font-semibold">{sessionOperator}</strong> •{' '}
+                {device.session_type === 'rustdesk' ? 'Native RustDesk Client' : 'Browser Monitor Session'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleReleaseSession}
+            className="w-full sm:w-auto px-3.5 py-1.5 rounded-lg bg-error/20 hover:bg-error/30 border border-error/50 text-xs font-semibold text-error transition-all shrink-0 text-center"
+            title="Clear the active session broadcast if this session has concluded"
+          >
+            Release Session Broadcast
+          </button>
+        </div>
+      )}
+
+      {/* Auto-Provisioned Fleet Badge */}
+      {device.is_auto_provisioned && (
+        <div className="p-2.5 sm:p-3 rounded-xl bg-primary/10 border border-primary/20 text-foreground flex items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-primary shrink-0" />
+            <span>This tablet was automatically configured via <strong>Fleet Auto-Provisioning</strong>.</span>
+          </div>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-primary/20 text-primary font-medium shrink-0">
+            Auto-Configured
+          </span>
+        </div>
+      )}
+
       {/* Zhentinel Remote Hub Card */}
       <div className="card border-primary/30 bg-input p-4 sm:p-6 space-y-4 sm:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 sm:pb-4 border-b border-border">
@@ -430,7 +637,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
           </div>
         </div>
 
-        {/* Remote ID & Quick Launch */}
+        {/* Remote ID & 1-Click Connect with Auto-Fill */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
           <div className="p-3 sm:p-4 rounded-xl bg-background border border-border space-y-2">
             <span className="text-[11px] sm:text-xs font-semibold text-foreground/70 uppercase tracking-wider">
@@ -455,38 +662,64 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
 
           <div className="p-3 sm:p-4 rounded-xl bg-background border border-border flex flex-col justify-between space-y-2.5 sm:space-y-2">
             <div>
-              <span className="text-[11px] sm:text-xs font-semibold text-foreground/70 uppercase tracking-wider">
-                1-Click Connection
-              </span>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] sm:text-xs font-semibold text-foreground/70 uppercase tracking-wider">
+                  One-Click Connection
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 font-medium">
+                  Auto-Copies Password
+                </span>
+              </div>
               <p className="text-xs text-foreground/60 mt-0.5 sm:mt-1">
-                Launches your local RustDesk application directly to this kiosk tablet.
+                Launches your local RustDesk application and copies the permanent password to your clipboard.
               </p>
             </div>
-            <button
-              onClick={handleConnectRustDesk}
-              className="w-full py-2.5 px-4 rounded-lg bg-primary text-primary-foreground font-semibold text-xs sm:text-sm hover:opacity-90 flex items-center justify-center gap-2 transition-all shadow-md"
-            >
-              <ExternalLink className="w-4 h-4" />
-              <span>Connect via RustDesk</span>
-            </button>
+
+            <div className="space-y-1.5">
+              <button
+                onClick={handleConnectRustDesk}
+                className="w-full py-2.5 px-4 rounded-lg bg-primary text-primary-foreground font-semibold text-xs sm:text-sm hover:opacity-90 flex items-center justify-center gap-2 transition-all shadow-md"
+              >
+                {passwordCopied ? <CheckCircle2 className="w-4 h-4 text-success" /> : <ExternalLink className="w-4 h-4" />}
+                <span>{passwordCopied ? 'Password Copied! Opening RustDesk...' : 'Connect via RustDesk'}</span>
+              </button>
+
+              {passwordCopied && (
+                <div className="text-[11px] text-success font-medium flex items-center justify-center gap-1.5 bg-success/10 py-1 px-2 rounded border border-success/20 animate-in fade-in">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Password copied to clipboard. Press Ctrl+V when prompted.</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Provisioning Credentials Form */}
+      {/* Provisioning Credentials Form & Fleet Profile Management */}
       <div className="card bg-input p-4 sm:p-6 space-y-3 sm:space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 sm:pb-3 border-b border-border">
           <div className="flex items-center gap-2">
             <Server className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
             <h3 className="text-base sm:text-lg font-bold">Remote Provisioning Credentials</h3>
           </div>
-          <span className="text-xs text-foreground/50 font-mono">provisioning.json</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleLoadFleetProfile}
+              className="text-[11px] text-primary hover:underline flex items-center gap-1 px-2 py-1 rounded bg-background border border-border"
+              title="Fill fields with current Fleet Default Profile"
+            >
+              <Sparkles className="w-3 h-3" />
+              <span>Load Fleet Default</span>
+            </button>
+            <span className="text-xs text-foreground/50 font-mono">provisioning.json</span>
+          </div>
         </div>
 
         <p className="text-xs text-foreground/70">
-          Update the private rendezvous server, relay, public key, and permanent password. Pushing
-          credentials will deploy `provisioning.json` with root permissions and restart the host
-          service automatically.
+          Update the rendezvous server, relay, public key, and permanent password. Pushing credentials
+          writes <code className="text-primary font-mono text-[11px]">provisioning.json</code> with root permissions
+          and restarts the host service automatically.
         </p>
 
         <form onSubmit={handleProvisioningSubmit} className="space-y-3 sm:space-y-4 pt-1 sm:pt-2">
@@ -573,11 +806,43 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
             </div>
           )}
 
-          <div className="flex justify-end pt-2">
+          {fleetMessage && (
+            <div
+              className={`p-3 rounded-lg text-xs flex items-center gap-2 ${
+                fleetStatus === 'success'
+                  ? 'bg-success/15 border border-success/30 text-success'
+                  : fleetStatus === 'error'
+                  ? 'bg-error/15 border border-error/30 text-error'
+                  : 'bg-primary/10 border border-primary/20 text-foreground'
+              }`}
+            >
+              {fleetStatus === 'loading' && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+              {fleetStatus === 'success' && <CheckCircle2 className="w-4 h-4 text-success" />}
+              {fleetStatus === 'error' && <AlertCircle className="w-4 h-4 text-error" />}
+              <span>{fleetMessage}</span>
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row justify-between gap-2.5 pt-2">
+            <button
+              type="button"
+              onClick={handleSaveFleetProfile}
+              disabled={fleetStatus === 'loading'}
+              className="py-2.5 px-4 rounded-lg bg-background border border-primary/40 hover:bg-primary/10 text-primary font-medium text-xs sm:text-sm flex items-center justify-center gap-2 transition-all"
+              title="Store these credentials in backend as the fleet default for all new tablets"
+            >
+              {fleetStatus === 'loading' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4 text-primary" />
+              )}
+              <span>Save as Fleet Default Profile</span>
+            </button>
+
             <button
               type="submit"
               disabled={provStatus === 'loading'}
-              className="w-full sm:w-auto py-2.5 px-6 rounded-lg bg-primary text-primary-foreground font-semibold text-xs sm:text-sm hover:opacity-90 flex items-center justify-center gap-2 transition-all shadow-md"
+              className="py-2.5 px-6 rounded-lg bg-primary text-primary-foreground font-semibold text-xs sm:text-sm hover:opacity-90 flex items-center justify-center gap-2 transition-all shadow-md"
             >
               {provStatus === 'loading' && <Loader2 className="w-4 h-4 animate-spin" />}
               <span>Push Provisioning & Restart Host</span>
@@ -586,30 +851,69 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
         </form>
       </div>
 
-      {/* Browser Snapshot Preview (Pure Socket JPEG Mirror, No WebRTC) */}
+      {/* Browser Snapshot Preview with Bandwidth & Framerate Presets */}
       <div className="card bg-input p-4 sm:p-6 space-y-3 sm:space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2.5 sm:pb-3 border-b border-border">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-2.5 sm:pb-3 border-b border-border">
           <div className="flex items-center gap-2">
             <Tv className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
-            <h3 className="text-base sm:text-lg font-bold">In-Browser Screen Preview</h3>
-            <span className="text-[10px] sm:text-[11px] px-2 py-0.5 rounded bg-background border border-border text-foreground/60 shrink-0">
-              Socket Fallback
-            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base sm:text-lg font-bold">In-Browser Screen Preview</h3>
+                <span className="text-[10px] sm:text-[11px] px-2 py-0.5 rounded bg-background border border-border text-foreground/60 shrink-0">
+                  Socket Stream
+                </span>
+              </div>
+              <p className="text-[11px] text-foreground/50">
+                Active Preset: <span className="text-primary font-medium">{PRESET_CONFIGS[bandwidthPreset].badge}</span>
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+
+          <div className="flex flex-wrap items-center gap-2 justify-end">
+            {/* Bandwidth & Framerate Preset Toggle */}
+            <div className="flex items-center bg-background p-1 rounded-lg border border-border text-xs">
+              <button
+                type="button"
+                onClick={() => handlePresetToggle('lan')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                  bandwidthPreset === 'lan'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-foreground/70 hover:text-foreground'
+                }`}
+                title="1080p / 30fps for low-latency LAN connections"
+              >
+                <Wifi className="w-3.5 h-3.5" />
+                <span>LAN Mode (1080p / 30fps)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePresetToggle('cellular')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                  bandwidthPreset === 'cellular'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-foreground/70 hover:text-foreground'
+                }`}
+                title="720p / 15fps optimized for cellular weak signal kiosks"
+              >
+                <Gauge className="w-3.5 h-3.5" />
+                <span>Cellular (720p / 15fps)</span>
+              </button>
+            </div>
+
+            {/* Stream Start/Stop */}
             {sessionState === 'connected' ? (
               <button
-                onClick={handleStopSocketPreview}
-                className="flex-1 sm:flex-initial py-1.5 px-3 rounded-lg bg-error text-primary-foreground text-xs font-medium hover:opacity-90 flex items-center justify-center gap-1.5 transition-all"
+                onClick={() => handleStopSocketPreview(true)}
+                className="py-1.5 px-3 rounded-lg bg-error text-primary-foreground text-xs font-medium hover:opacity-90 flex items-center justify-center gap-1.5 transition-all"
               >
                 <Square className="w-3.5 h-3.5" />
                 <span>Stop Preview</span>
               </button>
             ) : (
               <button
-                onClick={handleStartSocketPreview}
+                onClick={() => handleStartSocketPreview()}
                 disabled={sessionState === 'connecting'}
-                className="flex-1 sm:flex-initial py-1.5 px-3 rounded-lg border border-border hover:bg-white/10 text-xs font-medium flex items-center justify-center gap-1.5 transition-all"
+                className="py-1.5 px-3 rounded-lg border border-border hover:bg-white/10 text-xs font-medium flex items-center justify-center gap-1.5 transition-all"
               >
                 {sessionState === 'connecting' ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
@@ -619,6 +923,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
                 <span>Start Browser Preview</span>
               </button>
             )}
+
             {frameSrc && (
               <button
                 onClick={() => setIsFullscreen(!isFullscreen)}
@@ -652,12 +957,26 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
               <Tv className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-foreground/20" />
               <p className="text-xs sm:text-sm font-medium">{statusMessage}</p>
               <p className="text-[11px] sm:text-xs">
-                For full 60fps low-latency remote control, launch the RustDesk desktop client above.
+                For full low-latency 60fps remote control, launch the RustDesk desktop client above.
               </p>
             </div>
           )}
         </div>
       </div>
+
+      {/* Concurrent Session Takeover Warning Dialog */}
+      <ConfirmDialog
+        open={warnSessionOpen}
+        title="Active Remote Session Warning"
+        description={`This kiosk is currently being controlled by ${sessionOperator}. Connecting may interfere with their active session. Do you want to proceed and open RustDesk?`}
+        confirmLabel="Proceed & Connect"
+        cancelLabel="Cancel"
+        onConfirm={() => {
+          setWarnSessionOpen(false);
+          executeConnectRustDesk();
+        }}
+        onCancel={() => setWarnSessionOpen(false)}
+      />
     </div>
   );
 }

@@ -3,7 +3,19 @@
 import { useState } from 'react';
 import { Socket } from 'socket.io-client';
 import { Device } from '@/lib/types';
-import { Shield, Server, Key, Lock, X, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import {
+  Shield,
+  Server,
+  Key,
+  Lock,
+  X,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  Sparkles,
+  Copy,
+  Check,
+} from 'lucide-react';
 
 interface ProvisioningModalProps {
   device: Device;
@@ -25,8 +37,11 @@ export const ProvisioningModal = ({
   const [key, setKey] = useState(device?.zhentinel_key || 'uHinkRyReE2WYB5SjKrDr3n6D2KOs1ZBvb+1pcAUYNI=');
   const [password, setPassword] = useState(device?.zhentinel_password || 'Lbrdc2021.');
   const [showPassword, setShowPassword] = useState(false);
+  const [copiedPwd, setCopiedPwd] = useState(false);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
+  const [fleetStatus, setFleetStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [fleetMessage, setFleetMessage] = useState('');
 
   // Synchronize from device data or localStorage cache
   useState(() => {
@@ -52,6 +67,68 @@ export const ProvisioningModal = ({
   }
 
   if (!isOpen) return null;
+
+  const handleCopyPassword = () => {
+    if (password) {
+      navigator.clipboard.writeText(password);
+      setCopiedPwd(true);
+      setTimeout(() => setCopiedPwd(false), 2000);
+    }
+  };
+
+  const handleSaveFleetProfile = () => {
+    if (!socket) return;
+    if (!server.trim() || !key.trim() || password.length < 8) {
+      setFleetStatus('error');
+      setFleetMessage('Valid Server, Key, and Password (>=8 chars) required.');
+      return;
+    }
+
+    setFleetStatus('loading');
+    setFleetMessage('Saving default fleet profile in backend...');
+    socket.emit(
+      'update_fleet_profile',
+      {
+        server: server.trim(),
+        relay: relay.trim(),
+        key: key.trim(),
+        password,
+        enabled: true,
+      },
+      (res: any) => {
+        if (res?.status === 'success') {
+          setFleetStatus('success');
+          setFleetMessage('Fleet Default Profile saved! New kiosks will auto-configure upon connection.');
+          setTimeout(() => {
+            setFleetStatus('idle');
+            setFleetMessage('');
+          }, 4000);
+        } else {
+          setFleetStatus('error');
+          setFleetMessage(res?.message || 'Failed to update fleet profile');
+        }
+      }
+    );
+  };
+
+  const handleLoadFleetProfile = () => {
+    if (!socket) return;
+    socket.emit('get_fleet_profile', (res: any) => {
+      const prof = res?.profile;
+      if (prof) {
+        if (prof.SERVER) setServer(prof.SERVER);
+        if (prof.RELAY) setRelay(prof.RELAY);
+        if (prof.KEY) setKey(prof.KEY);
+        if (prof.PASSWORD) setPassword(prof.PASSWORD);
+        setFleetStatus('success');
+        setFleetMessage('Loaded fleet profile default parameters.');
+        setTimeout(() => {
+          setFleetStatus('idle');
+          setFleetMessage('');
+        }, 3000);
+      }
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,15 +227,28 @@ export const ProvisioningModal = ({
           </button>
         </div>
 
-        {/* Target Device Info */}
-        <div className="my-3 sm:my-4 p-2.5 sm:p-3 rounded-lg bg-background border border-border/60 text-xs flex justify-between items-center gap-2">
-          <div className="truncate">
-            <span className="font-semibold text-foreground/80">Target:</span>{' '}
-            <span className="font-medium text-foreground">{device.device_name}</span>
+        {/* Target Device Info & Fleet Profile Helper */}
+        <div className="my-3 sm:my-4 p-2.5 sm:p-3 rounded-lg bg-background border border-border/60 text-xs flex flex-col gap-2">
+          <div className="flex justify-between items-center gap-2">
+            <div className="truncate">
+              <span className="font-semibold text-foreground/80">Target:</span>{' '}
+              <span className="font-medium text-foreground">{device.device_name}</span>
+            </div>
+            <div className="shrink-0">
+              <span className="font-semibold text-foreground/80">ID:</span>{' '}
+              <span className="font-mono text-primary font-bold">{device.rustdesk_id || device.zhentinel_id || 'Pending'}</span>
+            </div>
           </div>
-          <div className="shrink-0">
-            <span className="font-semibold text-foreground/80">ID:</span>{' '}
-            <span className="font-mono text-primary font-bold">{device.rustdesk_id || device.zhentinel_id || 'Pending'}</span>
+          <div className="flex items-center justify-between pt-1.5 border-t border-border/40 text-[11px]">
+            <span className="text-foreground/60">Fleet Auto-Provisioning Profile:</span>
+            <button
+              type="button"
+              onClick={handleLoadFleetProfile}
+              className="text-primary hover:underline flex items-center gap-1 font-medium"
+            >
+              <Sparkles className="w-3 h-3" />
+              <span>Load Fleet Default</span>
+            </button>
           </div>
         </div>
 
@@ -210,13 +300,24 @@ export const ProvisioningModal = ({
               <label className="text-xs font-semibold flex items-center gap-1.5 text-foreground/90">
                 <Lock className="w-3.5 h-3.5 text-primary" /> Permanent Password
               </label>
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="text-[11px] text-primary hover:underline"
-              >
-                {showPassword ? 'Hide' : 'Show'}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyPassword}
+                  className="text-[11px] text-foreground/70 hover:text-foreground flex items-center gap-1"
+                  title="Copy permanent password"
+                >
+                  {copiedPwd ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
+                  <span>{copiedPwd ? 'Copied' : 'Copy'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-[11px] text-primary hover:underline"
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
             </div>
             <input
               type={showPassword ? 'text' : 'password'}
@@ -230,6 +331,24 @@ export const ProvisioningModal = ({
               Sets the permanent remote-access password on the target tablet.
             </p>
           </div>
+
+          {/* Fleet Profile Message */}
+          {fleetMessage && (
+            <div
+              className={`p-3 rounded-lg text-xs flex items-center gap-2 ${
+                fleetStatus === 'success'
+                  ? 'bg-success/15 border border-success/30 text-success'
+                  : fleetStatus === 'error'
+                  ? 'bg-error/15 border border-error/30 text-error'
+                  : 'bg-primary/10 border border-primary/20 text-foreground'
+              }`}
+            >
+              {fleetStatus === 'loading' && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+              {fleetStatus === 'success' && <CheckCircle2 className="w-4 h-4 text-success" />}
+              {fleetStatus === 'error' && <AlertCircle className="w-4 h-4 text-error" />}
+              <span>{fleetMessage}</span>
+            </div>
+          )}
 
           {/* Feedback message */}
           {message && (
@@ -250,23 +369,36 @@ export const ProvisioningModal = ({
           )}
 
           {/* Action Buttons */}
-          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-3 border-t border-border mt-4">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-2 sm:gap-3 pt-3 border-t border-border mt-4">
             <button
               type="button"
-              onClick={onClose}
-              disabled={status === 'loading'}
-              className="w-full sm:w-auto px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium border border-border hover:bg-white/5 transition-colors text-center"
+              onClick={handleSaveFleetProfile}
+              disabled={fleetStatus === 'loading'}
+              className="w-full sm:w-auto px-3.5 py-2 rounded-lg text-xs font-medium border border-primary/30 hover:bg-primary/10 text-primary flex items-center justify-center gap-1.5 transition-all text-center"
+              title="Save current credentials as the default auto-provision profile for all future tablets"
             >
-              Cancel
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
+              <span>Save as Fleet Default</span>
             </button>
-            <button
-              type="submit"
-              disabled={status === 'loading'}
-              className="w-full sm:w-auto px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold bg-primary text-primary-foreground hover:opacity-90 flex items-center justify-center gap-2 transition-all shadow-md"
-            >
-              {status === 'loading' && <Loader2 className="w-4 h-4 animate-spin" />}
-              <span>Push Credentials & Restart</span>
-            </button>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={status === 'loading'}
+                className="flex-1 sm:flex-initial px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium border border-border hover:bg-white/5 transition-colors text-center"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={status === 'loading'}
+                className="flex-1 sm:flex-initial px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold bg-primary text-primary-foreground hover:opacity-90 flex items-center justify-center gap-2 transition-all shadow-md"
+              >
+                {status === 'loading' && <Loader2 className="w-4 h-4 animate-spin" />}
+                <span>Push & Restart</span>
+              </button>
+            </div>
           </div>
         </form>
       </div>
