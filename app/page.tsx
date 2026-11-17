@@ -24,10 +24,16 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<TabId>('monitor');
   const [isProvisioningOpen, setIsProvisioningOpen] = useState(false);
 
-  // Auto-select first device when devices load
+  // Auto-select preferred device when devices load (prioritizing online devices with RustDesk)
   useEffect(() => {
-    if (devices.length > 0 && !selectedDeviceId) {
-      setSelectedDeviceId(devices[0].device_id);
+    if (devices.length > 0) {
+      if (!selectedDeviceId || !devices.some((d) => d.device_id === selectedDeviceId)) {
+        const preferred =
+          devices.find((d) => d.connection_status === 'connected' && Boolean(d.rustdesk_id || d.zhentinel_id)) ||
+          devices.find((d) => d.connection_status === 'connected') ||
+          devices[0];
+        setSelectedDeviceId(preferred.device_id);
+      }
     }
   }, [devices, selectedDeviceId]);
 
