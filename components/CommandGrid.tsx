@@ -27,14 +27,14 @@ export const CommandGrid = ({
   onCommandExecute,
 }: CommandGridProps) => {
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {Object.entries(DEVICE_COMMANDS).map(([category, commands]) => (
-        <div key={category} className="card">
-          <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
+        <div key={category} className="card p-3.5 sm:p-5">
+          <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-foreground flex items-center gap-2">
             <span>{categoryIcons[category as keyof typeof categoryIcons]}</span>
             {category}
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
             {commands.map((cmd) => (
               <CommandButton
                 key={cmd.id}

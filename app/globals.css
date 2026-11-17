@@ -49,7 +49,16 @@
   }
 
   .card {
-    @apply bg-input border border-border rounded-lg p-6 shadow-sm;
+    @apply bg-input border border-border rounded-lg p-4 sm:p-6 shadow-sm;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 
   .spinner {

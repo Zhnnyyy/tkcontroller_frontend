@@ -354,13 +354,13 @@ export function FileManager({ socket, device }: FileManagerProps) {
 
   return (
     <div className="card">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3 sm:mb-4">
         <div>
-          <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <FolderOpen className="w-5 h-5 text-primary" />
-            Remote File Explorer
+          <h2 className="text-base sm:text-xl font-bold text-foreground flex items-center gap-2">
+            <FolderOpen className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
+            <span>Remote File Explorer</span>
           </h2>
-          <p className="mt-1 text-sm text-foreground/60">
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-foreground/60">
             Browse, download, and upload files on the tablet
           </p>
         </div>
@@ -373,20 +373,20 @@ export function FileManager({ socket, device }: FileManagerProps) {
           />
           <button
             type="button"
-            className="btn-secondary flex items-center gap-2"
+            className="btn-secondary flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm py-1.5 sm:py-2 px-3 sm:px-4"
             onClick={handleUploadClick}
             disabled={loading || uploading}
           >
             {uploading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
             ) : (
-              <Upload className="w-4 h-4" />
+              <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             )}
-            Upload File
+            <span>Upload File</span>
           </button>
           <button
             type="button"
-            className="btn-ghost p-2"
+            className="btn-ghost p-1.5 sm:p-2 shrink-0"
             onClick={() => fetchFiles(currentPath)}
             disabled={loading || uploading}
             aria-label="Refresh files"
@@ -397,12 +397,12 @@ export function FileManager({ socket, device }: FileManagerProps) {
       </div>
 
       {/* Path Input Bar */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-input rounded-lg border border-border mb-4">
+      <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-input rounded-lg border border-border mb-3 sm:mb-4">
         <button
           type="button"
           onClick={handleGoBack}
           disabled={loading}
-          className="p-1 hover:bg-background rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="p-1 hover:bg-background rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
           aria-label="Go back"
         >
           <ArrowLeft className="w-4 h-4 text-foreground" />
@@ -417,13 +417,13 @@ export function FileManager({ socket, device }: FileManagerProps) {
             }
           }}
           disabled={loading}
-          className="flex-1 bg-transparent border-0 outline-none text-xs font-mono text-foreground font-semibold focus:ring-0 p-0"
+          className="flex-1 min-w-0 bg-transparent border-0 outline-none text-xs font-mono text-foreground font-semibold focus:ring-0 p-0"
         />
         <button
           type="button"
           onClick={() => fetchFiles(pathToInput)}
           disabled={loading}
-          className="bg-primary hover:opacity-90 text-primary-foreground text-xs py-1 px-3 rounded-md transition-all font-medium"
+          className="bg-primary hover:opacity-90 text-primary-foreground text-xs py-1 px-2.5 sm:px-3 rounded-md transition-all font-medium shrink-0"
         >
           Go
         </button>
@@ -480,29 +480,29 @@ export function FileManager({ socket, device }: FileManagerProps) {
 
       {/* File Browser Table */}
       <div className="border border-border rounded-lg overflow-hidden bg-background">
-        <div className="max-h-96 overflow-y-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="max-h-96 overflow-y-auto overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-full">
             <thead>
-              <tr className="bg-input/50 text-xs text-foreground/60 border-b border-border font-medium">
-                <th className="p-3 w-1/2">Name</th>
-                <th className="p-3 w-1/4">Size</th>
-                <th className="p-3 w-1/4">Last Modified</th>
-                <th className="p-3 text-right">Actions</th>
+              <tr className="bg-input/50 text-[11px] sm:text-xs text-foreground/60 border-b border-border font-medium">
+                <th className="p-2 sm:p-3">Name</th>
+                <th className="p-2 sm:p-3 w-16 sm:w-24 text-right sm:text-left">Size</th>
+                <th className="hidden md:table-cell p-3 w-1/4">Last Modified</th>
+                <th className="p-2 sm:p-3 text-right w-16 sm:w-20">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-foreground/50">
+                  <td colSpan={4} className="p-6 sm:p-8 text-center text-foreground/50">
                     <div className="flex flex-col items-center gap-2">
-                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                      <span>Reading directory...</span>
+                      <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin text-primary" />
+                      <span className="text-xs sm:text-sm">Reading directory...</span>
                     </div>
                   </td>
                 </tr>
               ) : files.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-foreground/40 text-sm">
+                  <td colSpan={4} className="p-6 sm:p-8 text-center text-foreground/40 text-xs sm:text-sm">
                     Empty directory
                   </td>
                 </tr>
@@ -510,52 +510,52 @@ export function FileManager({ socket, device }: FileManagerProps) {
                 files.map((file) => (
                   <tr
                     key={file.name}
-                    className="border-b border-border/50 last:border-0 hover:bg-input/20 transition-colors text-sm"
+                    className="border-b border-border/50 last:border-0 hover:bg-input/20 transition-colors text-xs sm:text-sm"
                   >
-                    <td className="p-3">
+                    <td className="p-2 sm:p-3 min-w-0">
                       {file.is_dir ? (
                         <button
                           type="button"
-                          className="flex items-center gap-2 text-primary hover:underline text-left font-semibold"
+                          className="flex items-center gap-1.5 sm:gap-2 text-primary hover:underline text-left font-semibold max-w-full"
                           onClick={() => handleNavigate(file)}
                         >
-                          <Folder className="w-4 h-4 fill-primary/20 flex-shrink-0" />
-                          <span className="truncate max-w-xs sm:max-w-md">{file.name}</span>
+                          <Folder className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-primary/20 shrink-0" />
+                          <span className="truncate max-w-[130px] xs:max-w-[180px] sm:max-w-xs md:max-w-md">{file.name}</span>
                         </button>
                       ) : (
-                        <div className="flex items-center gap-2 text-foreground/80">
-                          <FileIcon className="w-4 h-4 text-foreground/45 flex-shrink-0" />
-                          <span className="truncate max-w-xs sm:max-w-md">{file.name}</span>
+                        <div className="flex items-center gap-1.5 sm:gap-2 text-foreground/80 max-w-full">
+                          <FileIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-foreground/45 shrink-0" />
+                          <span className="truncate max-w-[130px] xs:max-w-[180px] sm:max-w-xs md:max-w-md">{file.name}</span>
                         </div>
                       )}
                     </td>
-                    <td className="p-3 text-foreground/60 text-xs font-mono">
+                    <td className="p-2 sm:p-3 text-foreground/60 text-[10px] sm:text-xs font-mono text-right sm:text-left whitespace-nowrap">
                       {file.is_dir ? '-' : formatBytes(file.size)}
                     </td>
-                    <td className="p-3 text-foreground/60 text-xs">
+                    <td className="hidden md:table-cell p-3 text-foreground/60 text-xs whitespace-nowrap">
                       {formatDate(file.last_modified)}
                     </td>
-                    <td className="p-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
+                    <td className="p-2 sm:p-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
                         {!file.is_dir && (
                           <button
                             type="button"
-                            className="p-1.5 hover:bg-input rounded-lg transition-colors text-foreground/75 hover:text-foreground inline-flex items-center"
+                            className="p-1 sm:p-1.5 hover:bg-input rounded-lg transition-colors text-foreground/75 hover:text-foreground inline-flex items-center"
                             onClick={() => handleDownload(file)}
                             title="Download file"
                             aria-label={`Download ${file.name}`}
                           >
-                            <Download className="w-4 h-4" />
+                            <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           </button>
                         )}
                         <button
                           type="button"
-                          className="p-1.5 hover:bg-error/15 rounded-lg transition-colors text-foreground/75 hover:text-error inline-flex items-center"
+                          className="p-1 sm:p-1.5 hover:bg-error/15 rounded-lg transition-colors text-foreground/75 hover:text-error inline-flex items-center"
                           onClick={() => handleDelete(file)}
                           title="Delete"
                           aria-label={`Delete ${file.name}`}
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </button>
                       </div>
                     </td>

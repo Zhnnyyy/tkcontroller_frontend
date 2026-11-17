@@ -140,11 +140,11 @@ export const AuthGate = ({ children }: { children: React.ReactNode }) => {
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-4">
-        <div className="w-full max-w-md rounded-2xl border border-border bg-input p-6 shadow-2xl">
-          <div className="h-1 w-full rounded-full bg-gradient-to-r from-primary via-secondary to-accent mb-6" />
-          <h1 className="text-2xl font-bold text-foreground">Device Controller</h1>
-          <p className="text-sm text-foreground/60 mt-1">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-md rounded-2xl border border-border bg-input p-5 sm:p-6 shadow-2xl">
+          <div className="h-1 w-full rounded-full bg-gradient-to-r from-primary via-secondary to-accent mb-5 sm:mb-6" />
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Device Controller</h1>
+          <p className="text-xs sm:text-sm text-foreground/60 mt-1">
             Sign in to access device controls
           </p>
 

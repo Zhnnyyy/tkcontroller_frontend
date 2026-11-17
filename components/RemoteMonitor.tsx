@@ -366,26 +366,26 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
 
   if (!device) {
     return (
-      <div className="card p-8 text-center text-foreground/60">
+      <div className="card p-6 sm:p-8 text-center text-foreground/60 text-sm">
         Please select a device from the sidebar to view remote controls.
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Zhentinel Remote Hub Card */}
-      <div className="card border-primary/30 bg-input p-6 space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-border">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/30 text-primary">
-              <Shield className="w-6 h-6" />
+      <div className="card border-primary/30 bg-input p-4 sm:p-6 space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 sm:pb-4 border-b border-border">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="p-2 sm:p-2.5 rounded-xl bg-primary/10 border border-primary/30 text-primary shrink-0">
+              <Shield className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
-            <div>
-              <h2 className="text-xl font-bold flex items-center gap-2">
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-xl font-bold flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <span>Zhentinel Remote Control</span>
                 <span
-                  className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
+                  className={`text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
                     isHostRunning
                       ? 'bg-success/20 text-success border border-success/30'
                       : 'bg-foreground/10 text-foreground/60'
@@ -394,17 +394,17 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
                   {isHostRunning ? '● Host Active' : '● Host Stopped'}
                 </span>
               </h2>
-              <p className="text-xs text-foreground/60 mt-0.5">
-                Headless zero-click RustDesk service running on target device {device.device_name}
+              <p className="text-[11px] sm:text-xs text-foreground/60 mt-0.5 truncate">
+                Headless zero-click RustDesk service on {device.device_name}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               onClick={handleCheckStatus}
               disabled={Boolean(actionLoading)}
-              className="btn-ghost flex items-center gap-1.5 text-xs py-2 px-3"
+              className="btn-ghost flex-1 sm:flex-initial flex items-center justify-center gap-1.5 text-xs py-1.5 sm:py-2 px-2.5 sm:px-3"
               title="Refresh Remote Host Status"
             >
               {actionLoading === 'check' ? (
@@ -417,7 +417,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
             <button
               onClick={handleRestartZhentinel}
               disabled={Boolean(actionLoading)}
-              className="btn-ghost flex items-center gap-1.5 text-xs py-2 px-3 text-warning hover:text-warning"
+              className="btn-ghost flex-1 sm:flex-initial flex items-center justify-center gap-1.5 text-xs py-1.5 sm:py-2 px-2.5 sm:px-3 text-warning hover:text-warning"
               title="Restart Zhentinel Host Service"
             >
               {actionLoading === 'restart' ? (
@@ -431,40 +431,40 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
         </div>
 
         {/* Remote ID & Quick Launch */}
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="p-4 rounded-xl bg-background border border-border space-y-2">
-            <span className="text-xs font-semibold text-foreground/70 uppercase tracking-wider">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+          <div className="p-3 sm:p-4 rounded-xl bg-background border border-border space-y-2">
+            <span className="text-[11px] sm:text-xs font-semibold text-foreground/70 uppercase tracking-wider">
               RustDesk Device ID
             </span>
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-2xl font-bold text-primary tracking-wide">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono text-xl sm:text-2xl font-bold text-primary tracking-wide truncate">
                 {rustdeskId || '1408621429'}
               </span>
               <button
                 onClick={handleCopyId}
-                className="p-2 rounded-lg border border-border hover:bg-white/10 text-foreground/70 hover:text-foreground transition-colors flex items-center gap-1.5 text-xs font-medium"
+                className="p-1.5 sm:p-2 rounded-lg border border-border hover:bg-white/10 text-foreground/70 hover:text-foreground transition-colors flex items-center gap-1.5 text-xs font-medium shrink-0"
               >
                 {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
                 <span>{copied ? 'Copied' : 'Copy ID'}</span>
               </button>
             </div>
-            <p className="text-[11px] text-foreground/50">
+            <p className="text-[10px] sm:text-[11px] text-foreground/50">
               Direct remote identifier for desktop RustDesk client connections.
             </p>
           </div>
 
-          <div className="p-4 rounded-xl bg-background border border-border flex flex-col justify-between space-y-2">
+          <div className="p-3 sm:p-4 rounded-xl bg-background border border-border flex flex-col justify-between space-y-2.5 sm:space-y-2">
             <div>
-              <span className="text-xs font-semibold text-foreground/70 uppercase tracking-wider">
+              <span className="text-[11px] sm:text-xs font-semibold text-foreground/70 uppercase tracking-wider">
                 1-Click Connection
               </span>
-              <p className="text-xs text-foreground/60 mt-1">
+              <p className="text-xs text-foreground/60 mt-0.5 sm:mt-1">
                 Launches your local RustDesk application directly to this kiosk tablet.
               </p>
             </div>
             <button
               onClick={handleConnectRustDesk}
-              className="w-full py-2.5 px-4 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 flex items-center justify-center gap-2 transition-all shadow-md"
+              className="w-full py-2.5 px-4 rounded-lg bg-primary text-primary-foreground font-semibold text-xs sm:text-sm hover:opacity-90 flex items-center justify-center gap-2 transition-all shadow-md"
             >
               <ExternalLink className="w-4 h-4" />
               <span>Connect via RustDesk</span>
@@ -474,11 +474,11 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
       </div>
 
       {/* Provisioning Credentials Form */}
-      <div className="card bg-input p-6 space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-border">
+      <div className="card bg-input p-4 sm:p-6 space-y-3 sm:space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 sm:pb-3 border-b border-border">
           <div className="flex items-center gap-2">
-            <Server className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-bold">Remote Provisioning Credentials</h3>
+            <Server className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
+            <h3 className="text-base sm:text-lg font-bold">Remote Provisioning Credentials</h3>
           </div>
           <span className="text-xs text-foreground/50 font-mono">provisioning.json</span>
         </div>
@@ -489,8 +489,8 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
           service automatically.
         </p>
 
-        <form onSubmit={handleProvisioningSubmit} className="space-y-4 pt-2">
-          <div className="grid md:grid-cols-2 gap-4">
+        <form onSubmit={handleProvisioningSubmit} className="space-y-3 sm:space-y-4 pt-1 sm:pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <label className="block text-xs font-semibold mb-1 flex items-center gap-1.5 text-foreground/90">
                 <Server className="w-3.5 h-3.5 text-primary" /> Rendezvous Server
@@ -500,7 +500,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
                 value={server}
                 onChange={(e) => setServer(e.target.value)}
                 placeholder="e.g. lbrdc-software.com:21116"
-                className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+                className="w-full px-3 py-2 text-xs sm:text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary font-mono"
                 required
               />
             </div>
@@ -514,7 +514,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
                 value={relay}
                 onChange={(e) => setRelay(e.target.value)}
                 placeholder="e.g. lbrdc-software.com:21117"
-                className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+                className="w-full px-3 py-2 text-xs sm:text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary font-mono"
               />
             </div>
           </div>
@@ -528,7 +528,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
               value={key}
               onChange={(e) => setKey(e.target.value)}
               placeholder="Server public key base64"
-              className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary font-mono text-xs"
+              className="w-full px-3 py-2 text-xs sm:text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary font-mono text-[11px] sm:text-xs"
               required
             />
           </div>
@@ -551,7 +551,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Minimum 8 characters"
-              className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+              className="w-full px-3 py-2 text-xs sm:text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary font-mono"
               required
             />
           </div>
@@ -577,7 +577,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
             <button
               type="submit"
               disabled={provStatus === 'loading'}
-              className="py-2.5 px-6 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 flex items-center gap-2 transition-all shadow-md"
+              className="w-full sm:w-auto py-2.5 px-6 rounded-lg bg-primary text-primary-foreground font-semibold text-xs sm:text-sm hover:opacity-90 flex items-center justify-center gap-2 transition-all shadow-md"
             >
               {provStatus === 'loading' && <Loader2 className="w-4 h-4 animate-spin" />}
               <span>Push Provisioning & Restart Host</span>
@@ -587,20 +587,20 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
       </div>
 
       {/* Browser Snapshot Preview (Pure Socket JPEG Mirror, No WebRTC) */}
-      <div className="card bg-input p-6 space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-border">
+      <div className="card bg-input p-4 sm:p-6 space-y-3 sm:space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2.5 sm:pb-3 border-b border-border">
           <div className="flex items-center gap-2">
-            <Tv className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-bold">In-Browser Screen Preview</h3>
-            <span className="text-[11px] px-2 py-0.5 rounded bg-background border border-border text-foreground/60">
+            <Tv className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
+            <h3 className="text-base sm:text-lg font-bold">In-Browser Screen Preview</h3>
+            <span className="text-[10px] sm:text-[11px] px-2 py-0.5 rounded bg-background border border-border text-foreground/60 shrink-0">
               Socket Fallback
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
             {sessionState === 'connected' ? (
               <button
                 onClick={handleStopSocketPreview}
-                className="py-1.5 px-3 rounded-lg bg-error text-primary-foreground text-xs font-medium hover:opacity-90 flex items-center gap-1.5 transition-all"
+                className="flex-1 sm:flex-initial py-1.5 px-3 rounded-lg bg-error text-primary-foreground text-xs font-medium hover:opacity-90 flex items-center justify-center gap-1.5 transition-all"
               >
                 <Square className="w-3.5 h-3.5" />
                 <span>Stop Preview</span>
@@ -609,7 +609,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
               <button
                 onClick={handleStartSocketPreview}
                 disabled={sessionState === 'connecting'}
-                className="py-1.5 px-3 rounded-lg border border-border hover:bg-white/10 text-xs font-medium flex items-center gap-1.5 transition-all"
+                className="flex-1 sm:flex-initial py-1.5 px-3 rounded-lg border border-border hover:bg-white/10 text-xs font-medium flex items-center justify-center gap-1.5 transition-all"
               >
                 {sessionState === 'connecting' ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
@@ -622,7 +622,7 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
             {frameSrc && (
               <button
                 onClick={() => setIsFullscreen(!isFullscreen)}
-                className="p-1.5 rounded-lg border border-border hover:bg-white/10 text-foreground/70"
+                className="p-1.5 rounded-lg border border-border hover:bg-white/10 text-foreground/70 shrink-0"
                 title="Toggle Fullscreen"
               >
                 {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -633,8 +633,8 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
 
         <div
           ref={monitorContainerRef}
-          className={`relative rounded-xl border border-border bg-black/80 overflow-hidden flex items-center justify-center min-h-[320px] ${
-            isFullscreen ? 'fixed inset-4 z-50 min-h-0' : ''
+          className={`relative rounded-xl border border-border bg-black/80 overflow-hidden flex items-center justify-center min-h-[240px] sm:min-h-[320px] max-h-[50vh] sm:max-h-[600px] ${
+            isFullscreen ? 'fixed inset-2 sm:inset-4 z-50 min-h-0 max-h-none' : ''
           }`}
         >
           {frameSrc ? (
@@ -642,16 +642,16 @@ export function RemoteMonitor({ socket, device }: RemoteMonitorProps) {
               ref={imageRef}
               src={frameSrc}
               alt="Remote device screen"
-              className="max-h-[600px] w-auto object-contain cursor-crosshair select-none"
+              className="max-h-[50vh] sm:max-h-[600px] w-auto max-w-full object-contain cursor-crosshair select-none touch-none"
               onPointerDown={handlePointerDown}
               onPointerUp={handlePointerUp}
               draggable={false}
             />
           ) : (
-            <div className="text-center p-8 space-y-2 text-foreground/50">
-              <Tv className="w-12 h-12 mx-auto text-foreground/20" />
-              <p className="text-sm font-medium">{statusMessage}</p>
-              <p className="text-xs">
+            <div className="text-center p-6 sm:p-8 space-y-2 text-foreground/50">
+              <Tv className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-foreground/20" />
+              <p className="text-xs sm:text-sm font-medium">{statusMessage}</p>
+              <p className="text-[11px] sm:text-xs">
                 For full 60fps low-latency remote control, launch the RustDesk desktop client above.
               </p>
             </div>

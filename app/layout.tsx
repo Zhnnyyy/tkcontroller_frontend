@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { SocketProvider } from '@/components/SocketProvider';
 import { AuthGate } from '@/components/AuthGate';
@@ -8,6 +8,12 @@ export const metadata: Metadata = {
   description: 'Web control interface for managing devices',
 };
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -15,7 +21,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-background text-foreground">
+      <body className="bg-background text-foreground antialiased">
         <AuthGate>
           <SocketProvider>{children}</SocketProvider>
         </AuthGate>

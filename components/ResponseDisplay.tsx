@@ -56,25 +56,25 @@ export const ResponseDisplay = ({ state, onClear }: ResponseDisplayProps) => {
   };
 
   return (
-    <div className="card">
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <h3 className="text-lg font-semibold text-foreground">Response</h3>
-          <p className="text-sm text-foreground/60 mt-1">
+    <div className="card p-4 sm:p-6">
+      <div className="flex items-start justify-between gap-2 mb-3 sm:mb-4">
+        <div className="min-w-0">
+          <h3 className="text-base sm:text-lg font-semibold text-foreground">Response</h3>
+          <p className="text-xs sm:text-sm text-foreground/60 mt-0.5 sm:mt-1 truncate">
             Command: <span className="font-mono font-medium">{state.command}</span>
           </p>
         </div>
         <button
           onClick={onClear}
-          className="p-2 hover:bg-input rounded-lg transition-colors"
+          className="p-1.5 sm:p-2 hover:bg-input rounded-lg transition-colors shrink-0"
           aria-label="Clear response"
         >
-          <X className="w-5 h-5 text-foreground/50 hover:text-foreground" />
+          <X className="w-4 h-4 sm:w-5 sm:h-5 text-foreground/50 hover:text-foreground" />
         </button>
       </div>
 
-      <div className="mb-4">
-        <div className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+      <div className="mb-3 sm:mb-4">
+        <div className={`inline-block px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[11px] sm:text-xs font-semibold ${
           state.status === 'success'
             ? 'bg-success/20 text-success'
             : state.status === 'error'
@@ -86,8 +86,8 @@ export const ResponseDisplay = ({ state, onClear }: ResponseDisplayProps) => {
       </div>
 
       {progressPercent !== null && (
-        <div className="mb-4">
-          <div className="flex items-center justify-between text-xs text-foreground/70 mb-2">
+        <div className="mb-3 sm:mb-4">
+          <div className="flex items-center justify-between text-xs text-foreground/70 mb-1.5 sm:mb-2">
             <span>{progressStage ? String(progressStage) : 'progress'}</span>
             <span>{progressPercent}%</span>
           </div>
@@ -101,23 +101,23 @@ export const ResponseDisplay = ({ state, onClear }: ResponseDisplayProps) => {
       )}
 
       {state.command === 'capture_screenshot' && (state.response as any)?.response?.image && (
-        <div className="mb-4 bg-background border border-border rounded-lg p-2 flex justify-center">
+        <div className="mb-3 sm:mb-4 bg-background border border-border rounded-lg p-2 flex justify-center">
           <img
             src={`data:image/png;base64,${(state.response as any).response.image}`}
             alt="Screenshot"
-            className="max-h-96 object-contain rounded-md"
+            className="max-h-64 sm:max-h-96 object-contain rounded-md"
           />
         </div>
       )}
 
-      <div className="bg-background border border-border rounded-lg p-4 mb-4 overflow-auto max-h-96">
-        <pre className="text-sm text-foreground/80 font-mono whitespace-pre-wrap break-words">
+      <div className="bg-background border border-border rounded-lg p-3 sm:p-4 mb-3 sm:mb-4 overflow-auto max-h-72 sm:max-h-96">
+        <pre className="text-xs sm:text-sm text-foreground/80 font-mono whitespace-pre-wrap break-all">
           {responseText}
         </pre>
       </div>
 
       {state.timestamp && (
-        <p className="text-xs text-foreground/50 mb-4">
+        <p className="text-[11px] sm:text-xs text-foreground/50 mb-3 sm:mb-4">
           Executed at {new Date(state.timestamp).toLocaleTimeString()}
         </p>
       )}
@@ -125,17 +125,17 @@ export const ResponseDisplay = ({ state, onClear }: ResponseDisplayProps) => {
       <div className="flex gap-2">
         <button
           onClick={handleCopy}
-          className="flex-1 btn-secondary flex items-center justify-center gap-2"
+          className="flex-1 btn-secondary text-xs sm:text-sm py-2 flex items-center justify-center gap-1.5 sm:gap-2"
         >
-          <Copy className="w-4 h-4" />
-          {copied ? 'Copied!' : 'Copy'}
+          <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <span>{copied ? 'Copied!' : 'Copy'}</span>
         </button>
         <button
           onClick={handleDownload}
-          className="flex-1 btn-secondary flex items-center justify-center gap-2"
+          className="flex-1 btn-secondary text-xs sm:text-sm py-2 flex items-center justify-center gap-1.5 sm:gap-2"
         >
-          <Download className="w-4 h-4" />
-          Download
+          <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <span>Download</span>
         </button>
       </div>
     </div>

@@ -166,12 +166,12 @@ export function Terminal({ socket, device }: TerminalProps) {
   }
 
   return (
-    <div className="card flex flex-col h-[450px]">
+    <div className="card flex flex-col h-[380px] sm:h-[450px] p-3.5 sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border pb-3 mb-3">
+      <div className="flex items-center justify-between border-b border-border pb-2.5 sm:pb-3 mb-2.5 sm:mb-3">
         <div className="flex items-center gap-2">
-          <TerminalIcon className="w-5 h-5 text-primary" />
-          <h2 className="text-xl font-bold text-foreground">Interactive Terminal</h2>
+          <TerminalIcon className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
+          <h2 className="text-base sm:text-xl font-bold text-foreground">Interactive Terminal</h2>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -188,32 +188,35 @@ export function Terminal({ socket, device }: TerminalProps) {
       {/* Terminal Screen */}
       <div 
         ref={consoleRef}
-        className="flex-1 bg-black border border-border/80 rounded-lg p-4 font-mono text-xs overflow-y-auto text-green-400 space-y-2 select-text"
+        className="flex-1 bg-black border border-border/80 rounded-lg p-3 sm:p-4 font-mono text-[11px] sm:text-xs overflow-y-auto text-green-400 space-y-2 select-text overflow-x-auto"
         onClick={() => inputRef.current?.focus()}
       >
         {history.map((line, idx) => {
           if (line.type === 'input') {
             return (
               <div key={idx} className="flex items-start gap-1">
-                <span className="text-blue-400 select-none">root@android:{line.dir ?? '/'}#</span>
-                <span className="text-white font-semibold whitespace-pre-wrap">{line.text}</span>
+                <span className="text-blue-400 select-none whitespace-nowrap">
+                  <span className="hidden sm:inline">root@android:</span>
+                  {line.dir ?? '/'}#
+                </span>
+                <span className="text-white font-semibold whitespace-pre-wrap break-all">{line.text}</span>
               </div>
             );
           } else if (line.type === 'error') {
             return (
-              <div key={idx} className="text-red-400 whitespace-pre-wrap">
+              <div key={idx} className="text-red-400 whitespace-pre-wrap break-all">
                 {line.text}
               </div>
             );
           } else if (line.type === 'info') {
             return (
-              <div key={idx} className="text-gray-500 italic select-none">
+              <div key={idx} className="text-gray-500 italic select-none break-all">
                 [info] {line.text}
               </div>
             );
           } else {
             return (
-              <div key={idx} className="text-gray-300 whitespace-pre-wrap leading-relaxed">
+              <div key={idx} className="text-gray-300 whitespace-pre-wrap leading-relaxed break-all">
                 {line.text}
               </div>
             );
@@ -228,9 +231,10 @@ export function Terminal({ socket, device }: TerminalProps) {
       </div>
  
       {/* Input Prompt bar */}
-      <div className="flex items-center gap-2 mt-3 bg-input rounded-lg border border-border px-3 py-2">
-        <span className="text-xs font-mono text-blue-400 font-bold select-none">
-          root@android:{currentDir}#
+      <div className="flex items-center gap-1.5 sm:gap-2 mt-2.5 sm:mt-3 bg-input rounded-lg border border-border px-2.5 sm:px-3 py-1.5 sm:py-2">
+        <span className="text-[11px] sm:text-xs font-mono text-blue-400 font-bold select-none whitespace-nowrap">
+          <span className="hidden sm:inline">root@android:</span>
+          {currentDir}#
         </span>
         <input
           type="text"
@@ -240,13 +244,13 @@ export function Terminal({ socket, device }: TerminalProps) {
           onKeyDown={handleKeyDown}
           disabled={loading}
           placeholder="Type shell command..."
-          className="flex-1 bg-transparent border-0 outline-none text-xs font-mono text-foreground focus:ring-0 p-0"
+          className="flex-1 min-w-0 bg-transparent border-0 outline-none text-[11px] sm:text-xs font-mono text-foreground focus:ring-0 p-0"
         />
         <button
           type="button"
           onClick={() => handleExecute()}
           disabled={loading || !input.trim()}
-          className="p-1 hover:bg-background rounded text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="p-1 hover:bg-background rounded text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
           title="Send"
         >
           <Play className="w-4 h-4 fill-current" />

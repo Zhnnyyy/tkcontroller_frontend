@@ -48,36 +48,38 @@ export default function Home() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-input">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground truncate">
                 Device Controller
               </h1>
-              <p className="text-foreground/60 text-sm mt-1">
+              <p className="text-foreground/60 text-xs sm:text-sm mt-0.5 sm:mt-1 truncate">
                 Manage and control your devices with ease
               </p>
             </div>
-            <div className="flex gap-2">
-              <div className="hidden sm:flex items-center text-xs text-foreground/60 mr-2">
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              <div className="hidden md:flex items-center text-xs text-foreground/60 mr-1 sm:mr-2">
                 {session?.username}
               </div>
               <button
                 onClick={handleRefreshDevices}
-                className="btn-ghost"
+                className="btn-ghost p-1.5 sm:p-2"
                 aria-label="Refresh devices"
+                title="Refresh Devices"
               >
-                <RotateCcw className="w-5 h-5" />
+                <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
               <button
-                className="btn-ghost"
+                className="btn-ghost p-1.5 sm:p-2"
                 aria-label="Settings"
+                title="Settings"
               >
-                <Settings className="w-5 h-5" />
+                <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
               <button
                 onClick={logout}
-                className="btn-ghost"
+                className="btn-ghost text-xs sm:text-sm px-2.5 sm:px-4 py-1.5 sm:py-2"
                 aria-label="Logout"
               >
                 Logout
@@ -88,9 +90,9 @@ export default function Home() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Connection Status */}
-        <div className="mb-8">
+        <div className="mb-4 sm:mb-8">
           <ConnectionStatus
             isConnected={isConnected}
             deviceCount={devices.length}
@@ -98,10 +100,10 @@ export default function Home() {
           />
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="card sticky top-6">
+            <div className="card lg:sticky lg:top-6">
               <DeviceSelector
                 devices={devices}
                 selectedDeviceId={selectedDeviceId}
@@ -112,57 +114,57 @@ export default function Home() {
           </div>
 
           {/* Main Panel */}
-          <div className="lg:col-span-2 flex flex-col">
+          <div className="lg:col-span-2 flex flex-col min-w-0">
             {/* Tabs Navigation */}
-            <div className="flex border-b border-border mb-6 overflow-x-auto whitespace-nowrap scrollbar-thin">
+            <div className="flex border-b border-border mb-4 sm:mb-6 overflow-x-auto whitespace-nowrap no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
               <button
                 onClick={() => setActiveTab('monitor')}
-                className={`py-3 px-6 font-medium text-sm transition-all border-b-2 -mb-[2px] flex items-center gap-2 ${
+                className={`py-2.5 px-3 sm:px-5 font-medium text-xs sm:text-sm transition-all border-b-2 -mb-[2px] flex items-center gap-1.5 sm:gap-2 shrink-0 ${
                   activeTab === 'monitor'
                     ? 'border-primary text-primary'
                     : 'border-transparent text-foreground/60 hover:text-foreground hover:border-border'
                 }`}
               >
-                <Tv className="w-4 h-4" />
+                <Tv className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 Remote & Screen
               </button>
               <button
                 onClick={() => setActiveTab('files')}
-                className={`py-3 px-6 font-medium text-sm transition-all border-b-2 -mb-[2px] flex items-center gap-2 ${
+                className={`py-2.5 px-3 sm:px-5 font-medium text-xs sm:text-sm transition-all border-b-2 -mb-[2px] flex items-center gap-1.5 sm:gap-2 shrink-0 ${
                   activeTab === 'files'
                     ? 'border-primary text-primary'
                     : 'border-transparent text-foreground/60 hover:text-foreground hover:border-border'
                 }`}
               >
-                <FolderOpen className="w-4 h-4" />
+                <FolderOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 File Manager
               </button>
               <button
                 onClick={() => setActiveTab('terminal')}
-                className={`py-3 px-6 font-medium text-sm transition-all border-b-2 -mb-[2px] flex items-center gap-2 ${
+                className={`py-2.5 px-3 sm:px-5 font-medium text-xs sm:text-sm transition-all border-b-2 -mb-[2px] flex items-center gap-1.5 sm:gap-2 shrink-0 ${
                   activeTab === 'terminal'
                     ? 'border-primary text-primary'
                     : 'border-transparent text-foreground/60 hover:text-foreground hover:border-border'
                 }`}
               >
-                <TerminalIcon className="w-4 h-4" />
+                <TerminalIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 Terminal
               </button>
               <button
                 onClick={() => setActiveTab('commands')}
-                className={`py-3 px-6 font-medium text-sm transition-all border-b-2 -mb-[2px] flex items-center gap-2 ${
+                className={`py-2.5 px-3 sm:px-5 font-medium text-xs sm:text-sm transition-all border-b-2 -mb-[2px] flex items-center gap-1.5 sm:gap-2 shrink-0 ${
                   activeTab === 'commands'
                     ? 'border-primary text-primary'
                     : 'border-transparent text-foreground/60 hover:text-foreground hover:border-border'
                 }`}
               >
-                <Cpu className="w-4 h-4" />
+                <Cpu className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 Commands & Output
               </button>
             </div>
 
             {/* Tab Panes */}
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <div className={activeTab === 'monitor' ? '' : 'hidden'}>
                 <RemoteMonitor socket={socket} device={selectedDevice} />
               </div>
@@ -175,10 +177,10 @@ export default function Home() {
                 <Terminal socket={socket} device={selectedDevice} />
               </div>
               
-              <div className={activeTab === 'commands' ? 'space-y-6' : 'hidden'}>
+              <div className={activeTab === 'commands' ? 'space-y-4 sm:space-y-6' : 'hidden'}>
                 {/* Commands Section */}
-                <section className="bg-input border border-border rounded-lg p-6">
-                  <h2 className="text-xl font-bold text-foreground mb-4">
+                <section className="bg-input border border-border rounded-lg p-4 sm:p-6">
+                  <h2 className="text-lg sm:text-xl font-bold text-foreground mb-3 sm:mb-4">
                     Available Commands
                   </h2>
                   <CommandGrid
@@ -189,8 +191,8 @@ export default function Home() {
                 </section>
 
                 {/* Response Section */}
-                <section className="bg-input border border-border rounded-lg p-6">
-                  <h2 className="text-xl font-bold text-foreground mb-4">
+                <section className="bg-input border border-border rounded-lg p-4 sm:p-6">
+                  <h2 className="text-lg sm:text-xl font-bold text-foreground mb-3 sm:mb-4">
                     Execution Result
                   </h2>
                   <ResponseDisplay
@@ -205,8 +207,8 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-input mt-12 sm:mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 text-center text-sm text-foreground/60">
+      <footer className="border-t border-border bg-input mt-8 sm:mt-16">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 text-center text-xs sm:text-sm text-foreground/60">
           <p>Device Controller v1.0 • Connected to backend</p>
         </div>
       </footer>

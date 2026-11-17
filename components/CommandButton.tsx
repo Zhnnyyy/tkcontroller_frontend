@@ -172,7 +172,7 @@ export const CommandButton = ({
         onClick={handleClick}
         disabled={isDisabled}
         className={`
-          relative w-full px-4 py-3 rounded-lg font-medium text-sm
+          relative w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium text-xs sm:text-sm
           transition-all duration-200 flex items-center justify-center gap-2
           ${
             isError

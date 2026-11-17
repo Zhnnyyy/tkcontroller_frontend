@@ -47,7 +47,7 @@ export const ConfirmDialog = ({
   if (!open || typeof window === 'undefined') return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <div
         className="absolute inset-0 bg-black/55 backdrop-blur-sm"
         onClick={onCancel}
@@ -56,28 +56,28 @@ export const ConfirmDialog = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-title"
-        className="relative w-full max-w-md rounded-2xl border border-border bg-background shadow-2xl"
+        className="relative w-full max-w-md rounded-2xl border border-border bg-background shadow-2xl max-h-[92vh] overflow-y-auto"
       >
         <div className="h-1 w-full rounded-t-2xl bg-gradient-to-r from-primary via-secondary to-accent" />
-        <div className="p-6">
-          <h2 id="confirm-title" className="text-lg font-semibold text-foreground">
+        <div className="p-4 sm:p-6">
+          <h2 id="confirm-title" className="text-base sm:text-lg font-semibold text-foreground">
             {title}
           </h2>
           {description && (
-            <p className="mt-2 text-sm text-foreground/70">{description}</p>
+            <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-foreground/70">{description}</p>
           )}
-          {children && <div className="mt-4">{children}</div>}
-          <div className="mt-6 flex items-center justify-end gap-3">
+          {children && <div className="mt-3 sm:mt-4">{children}</div>}
+          <div className="mt-5 sm:mt-6 flex flex-col-reverse sm:flex-row items-center justify-end gap-2 sm:gap-3">
             <button
               type="button"
-              className="btn-ghost"
+              className="btn-ghost w-full sm:w-auto text-center justify-center text-xs sm:text-sm py-2"
               onClick={onCancel}
             >
               {cancelLabel}
             </button>
             <button
               type="button"
-              className="btn-primary"
+              className="btn-primary w-full sm:w-auto text-center justify-center text-xs sm:text-sm py-2"
               onClick={onConfirm}
               disabled={confirmDisabled}
             >

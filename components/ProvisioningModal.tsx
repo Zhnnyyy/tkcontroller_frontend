@@ -133,36 +133,37 @@ export const ProvisioningModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg rounded-xl border border-border bg-input shadow-2xl p-6 text-foreground">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-lg rounded-xl border border-border bg-input shadow-2xl p-4 sm:p-6 text-foreground max-h-[92vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-border">
+        <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-border">
           <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-bold">Zhentinel Remote Provisioning</h3>
+            <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
+            <h3 className="text-base sm:text-lg font-bold">Zhentinel Remote Provisioning</h3>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-foreground/60 hover:text-foreground hover:bg-white/10 transition-colors"
+            className="p-1 sm:p-1.5 rounded-lg text-foreground/60 hover:text-foreground hover:bg-white/10 transition-colors shrink-0"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Target Device Info */}
-        <div className="my-4 p-3 rounded-lg bg-background border border-border/60 text-xs flex justify-between items-center">
-          <div>
+        <div className="my-3 sm:my-4 p-2.5 sm:p-3 rounded-lg bg-background border border-border/60 text-xs flex justify-between items-center gap-2">
+          <div className="truncate">
             <span className="font-semibold text-foreground/80">Target:</span>{' '}
             <span className="font-medium text-foreground">{device.device_name}</span>
           </div>
-          <div>
+          <div className="shrink-0">
             <span className="font-semibold text-foreground/80">ID:</span>{' '}
             <span className="font-mono text-primary font-bold">{device.rustdesk_id || device.zhentinel_id || 'Pending'}</span>
           </div>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
           <div>
             <label className="block text-xs font-semibold mb-1 flex items-center gap-1.5 text-foreground/90">
               <Server className="w-3.5 h-3.5 text-primary" /> Rendezvous Server
@@ -172,7 +173,7 @@ export const ProvisioningModal = ({
               value={server}
               onChange={(e) => setServer(e.target.value)}
               placeholder="e.g. lbrdc-software.com:21116"
-              className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+              className="w-full px-3 py-2 text-xs sm:text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary font-mono"
               required
             />
           </div>
@@ -186,7 +187,7 @@ export const ProvisioningModal = ({
               value={relay}
               onChange={(e) => setRelay(e.target.value)}
               placeholder="e.g. lbrdc-software.com:21117"
-              className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+              className="w-full px-3 py-2 text-xs sm:text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary font-mono"
             />
           </div>
 
@@ -199,7 +200,7 @@ export const ProvisioningModal = ({
               value={key}
               onChange={(e) => setKey(e.target.value)}
               placeholder="Server public key base64"
-              className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary font-mono text-xs"
+              className="w-full px-3 py-2 text-xs sm:text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary font-mono text-[11px] sm:text-xs"
               required
             />
           </div>
@@ -222,7 +223,7 @@ export const ProvisioningModal = ({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Minimum 8 characters"
-              className="w-full px-3 py-2 text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+              className="w-full px-3 py-2 text-xs sm:text-sm rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary font-mono"
               required
             />
             <p className="text-[11px] text-foreground/50 mt-1">
@@ -249,19 +250,19 @@ export const ProvisioningModal = ({
           )}
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3 pt-3 border-t border-border mt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-3 border-t border-border mt-4">
             <button
               type="button"
               onClick={onClose}
               disabled={status === 'loading'}
-              className="px-4 py-2 rounded-lg text-sm font-medium border border-border hover:bg-white/5 transition-colors"
+              className="w-full sm:w-auto px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium border border-border hover:bg-white/5 transition-colors text-center"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={status === 'loading'}
-              className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-2 transition-all shadow-md"
+              className="w-full sm:w-auto px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold bg-primary text-primary-foreground hover:opacity-90 flex items-center justify-center gap-2 transition-all shadow-md"
             >
               {status === 'loading' && <Loader2 className="w-4 h-4 animate-spin" />}
               <span>Push Credentials & Restart</span>
